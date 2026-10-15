@@ -324,6 +324,12 @@ const main = (config) => {
 
     "网络检测": "Network-test.png",
 
+    "广告拦截": "Ads.png",
+
+    "软件分流": "Software.png",
+
+    "Twitter": "Twitter.png",
+
     "Netflix": "Netflix.png",
 
     "Spotify": "Spotify.png",
@@ -1502,24 +1508,15 @@ const main = (config) => {
   }
 
 
-  // AI 组单独构造，不走 createBusinessGroup：
+  // 地区锁较硬的服务用 fallback 组：顺序即优先级，首选健康就固定用它，
+  // 出口 IP 不因延迟波动而漂移；也不依赖 profile.store-selected，
+  // 地区组变动时不会像 select 组那样弹回列表首项。
   //
-  //   1. 类型用 fallback 而不是 select —— 顺序即优先级，只要首选健康
-  //      就固定用它，出口 IP 不因延迟波动而漂移；同时不依赖
-  //      profile.store-selected，地区组变动时不会弹回列表首项。
-  //   2. 美国排第一位，首次加载即默认走美国。
-  //   3. 不放入「国内直连」，避免误选后 ChatGPT 必然超时。
-  //   4. 不放入「香港」：OpenAI 不支持香港，而香港节点做连通性
-  //      健康检查是会通过的，属于「健康但不可用」。
-  function createAIGroup() {
+  // preferredRegions 按优先级排列；不在列表里的地区（香港除外）作为后备，
+  // 香港不入选 —— 它对 OpenAI 等属于「健康但不可用」。
+  function createFallbackGroup(name, preferredRegions) {
 
-    const preferred = [
-      "美国",
-      "日本",
-      "新加坡",
-      "台湾",
-      "韩国"
-    ].filter((region) => {
+    const preferred = preferredRegions.filter((region) => {
 
       return availableRegions.indexOf(region) !== -1;
 
@@ -1552,7 +1549,7 @@ const main = (config) => {
 
     const group = {
 
-      "name": "AI",
+      "name": name,
 
       "type": "fallback",
 
@@ -1575,7 +1572,7 @@ const main = (config) => {
 
 
     const icon =
-      getGroupIcon("AI");
+      getGroupIcon(name);
 
 
     if (icon) {
@@ -1590,7 +1587,13 @@ const main = (config) => {
 
   const businessGroups = [
 
-    createAIGroup(),
+    createFallbackGroup("AI", [
+      "美国",
+      "日本",
+      "新加坡",
+      "台湾",
+      "韩国"
+    ]),
 
     createBusinessGroup("YouTube"),
 
@@ -1598,7 +1601,14 @@ const main = (config) => {
 
     createBusinessGroup("GitHub"),
 
-    createBusinessGroup("Netflix"),
+    // Netflix 地区锁最硬，与 AI 同样固定美国优先
+    createFallbackGroup("Netflix", [
+      "美国",
+      "日本",
+      "新加坡",
+      "台湾",
+      "韩国"
+    ]),
 
     createBusinessGroup("Spotify"),
 
@@ -1659,6 +1669,15 @@ const main = (config) => {
     ]
 
   };
+
+
+  const adBlockIcon =
+    getGroupIcon("广告拦截");
+
+
+  if (adBlockIcon) {
+    adBlockGroup["icon"] = adBlockIcon;
+  }
 
 
   // ================================================================
