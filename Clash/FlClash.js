@@ -305,7 +305,7 @@ const main = (config) => {
   // ================================================================
 
   const iconBaseURL =
-    "https://cdn.jsdelivr.net/gh/n0de-sudo/Perfect-Rules@main/Clash/icons/";
+    "https://cdn.jsdelivr.net/gh/Naisisor/Perfect-Rules@main/Clash/icons/";
 
 
   const groupIcons = {
@@ -868,7 +868,7 @@ const main = (config) => {
   // ================================================================
 
   const ruleBaseURL =
-    "https://cdn.jsdelivr.net/gh/n0de-sudo/Perfect-Rules@main/Clash/rules/";
+    "https://cdn.jsdelivr.net/gh/Naisisor/Perfect-Rules@main/Clash/rules/";
 
 
   // ================================================================
