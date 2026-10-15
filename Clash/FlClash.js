@@ -1512,9 +1512,13 @@ const main = (config) => {
   // 出口 IP 不因延迟波动而漂移；也不依赖 profile.store-selected，
   // 地区组变动时不会像 select 组那样弹回列表首项。
   //
-  // preferredRegions 按优先级排列；不在列表里的地区（香港除外）作为后备，
-  // 香港不入选 —— 它对 OpenAI 等属于「健康但不可用」。
-  function createFallbackGroup(name, preferredRegions) {
+  // preferredRegions 按优先级排列；不在列表里的地区作为后备。
+  //
+  // includeHongKong 控制是否把「香港」作为最后兜底：
+  //   AI 不启用 —— OpenAI 不支持香港，而香港节点做连通性健康检查
+  //   是会通过的，属于「健康但不可用」；
+  //   YouTube / Netflix / X 启用 —— 香港对这三者完全可用且延迟最低。
+  function createFallbackGroup(name, preferredRegions, includeHongKong) {
 
     const preferred = preferredRegions.filter((region) => {
 
@@ -1535,6 +1539,15 @@ const main = (config) => {
 
     const proxies =
       preferred.concat(backup);
+
+
+    // 香港作为最后兜底
+    if (
+      includeHongKong &&
+      availableRegions.indexOf("香港") !== -1
+    ) {
+      proxies.push("香港");
+    }
 
 
     // 极端情况：机场只有香港节点 —— 退回全部地区，避免生成空组。
@@ -1597,18 +1610,18 @@ const main = (config) => {
 
   const businessGroups = [
 
-    // 美国优先：AI 服务（OpenAI 不支持香港）
+    // 美国优先：AI 服务（OpenAI 不支持香港，末尾不补香港）
     createFallbackGroup("AI", usFirstRegions),
 
-    // 美国优先：YouTube（美区内容/趋势更全）
-    createFallbackGroup("YouTube", usFirstRegions),
+    // 美国优先：YouTube（香港对 YouTube 可用，作末尾兜底）
+    createFallbackGroup("YouTube", usFirstRegions, true),
 
     createBusinessGroup("Google"),
 
     createBusinessGroup("GitHub"),
 
-    // 美国优先：Netflix（地区锁最硬）
-    createFallbackGroup("Netflix", usFirstRegions),
+    // 美国优先：Netflix（香港对 Netflix 可用，作末尾兜底）
+    createFallbackGroup("Netflix", usFirstRegions, true),
 
     createBusinessGroup("Spotify"),
 
@@ -1618,8 +1631,8 @@ const main = (config) => {
 
     createBusinessGroup("TikTok"),
 
-    // 美国优先：X（原 Twitter）
-    createFallbackGroup("X", usFirstRegions),
+    // 美国优先：X（香港对 X 可用，作末尾兜底）
+    createFallbackGroup("X", usFirstRegions, true),
 
     createBusinessGroup("软件分流"),
 
