@@ -827,29 +827,27 @@ const main = (config) => {
     delete copied["hidden"];
 
 
-    // 把伪节点（剩余流量 / 到期时间 / 官网 …）挪到候选末尾。
+    // 彻底剔除伪节点（剩余流量 / 到期时间 / 官网 …）。
     //
-    // select 组的默认项就是候选第一项：伪节点若被机场排在组内最前，
-    // 就会成为该组的默认出口（「网络检测」跟随机场默认选择器走时
-    // 也会被一起带偏）。挪到末尾既保留机场的信息展示，
-    // 又保证默认项一定是真实节点。
+    // 它们不是真实代理：留在候选里既可能成为 select 组的默认出口
+    // （select 的默认项就是第一项，「网络检测」跟随机场默认选择器走时
+    // 会被一起带偏），也会污染 url-test / fallback 的健康检查。
+    //
+    // 过滤后若组内一个真实节点都不剩，则整组丢弃 ——
+    // 避免生成空候选组导致 mihomo 拒绝整份配置。
     if (Array.isArray(copied.proxies)) {
 
-      const realItems = [];
-      const junkItems = [];
+      copied.proxies =
+        copied.proxies.filter((item) => {
 
-      copied.proxies.forEach((item) => {
+          return !junkPattern.test(String(item));
 
-        if (junkPattern.test(String(item))) {
-          junkItems.push(item);
-        } else {
-          realItems.push(item);
-        }
-
-      });
+        });
 
 
-      copied.proxies = realItems.concat(junkItems);
+      if (copied.proxies.length === 0) {
+        return;
+      }
 
     }
 
