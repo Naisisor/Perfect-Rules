@@ -949,9 +949,9 @@ const main = (config) => {
 
     "香港": [
 
+      /🇭🇰/,
       /香港/i,
-      /\bHK\b/i,
-      /HKG/i,
+      /HK/i,
       /Hong\s*Kong/i,
       /HongKong/i
 
@@ -960,9 +960,11 @@ const main = (config) => {
 
     "台湾": [
 
+      /🇹🇼/,
       /台湾/i,
       /台灣/i,
       /\bTW\b/i,
+      /(^|[^A-Za-z])TW[-_\s]?\d/i,
       /TPE/i,
       /KHH/i,
       /TSA/i,
@@ -974,13 +976,12 @@ const main = (config) => {
 
     "日本": [
 
+      /🇯🇵/,
       /日本/i,
       /\bJP\b/i,
-      /NRT/i,
-      /HND/i,
-      /KIX/i,
-      /CTS/i,
-      /FUK/i,
+      /(^|[^A-Za-z])JP[-_\s]?\d/i,
+      /JPN/i,
+      /NRT|HND|KIX|CTS|FUK|OKA|NGO/i,
       /Japan/i,
       /Tokyo/i,
       /Osaka/i
@@ -990,8 +991,11 @@ const main = (config) => {
 
     "新加坡": [
 
+      /🇸🇬/,
       /新加坡/i,
       /\bSG\b/i,
+      /(^|[^A-Za-z])SG[-_\s]?\d/i,
+      /SGP/i,
       /SIN/i,
       /XSP/i,
       /Singapore/i
@@ -1001,38 +1005,58 @@ const main = (config) => {
 
     "韩国": [
 
+      /🇰🇷/,
       /韩国/i,
       /韓國/i,
       /\bKR\b/i,
-      /ICN/i,
-      /GMP/i,
-      /PUS/i,
+      /(^|[^A-Za-z])KR[-_\s]?\d/i,
+      /ICN|GMP|PUS/i,
       /Korea/i,
       /Seoul/i
 
     ],
 
 
+    // 美国节点命名最混乱，这里覆盖：
+    //   旗帜 emoji（🇺🇸 01）
+    //   国家名（美国 / 美西 / 美东 / 美区 / 美利坚 / United States / America）
+    //   无分隔符编号（US01 / US-01 / US_01 / USA01 / 美01）
+    //   主要机场三字码与城市名（英文 + 中文）
+    //
+    // 注意：三字码用 (^|[^A-Za-z]) ... (?![A-Za-z]) 卡住词边界，
+    // 否则 AUS 会命中 Australia、DEN 会命中 Denmark。
     "美国": [
 
+      /🇺🇸/,
       /美国/i,
+      /美西/i,
+      /美东/i,
+      /美区/i,
+      /美利坚/i,
+      /美[-_\s]?\d/i,
       /\bUS\b/i,
-      /\bUSA\b/i,
-      /LAX/i,
-      /SFO/i,
-      /JFK/i,
-      /SJC/i,
+      /(^|[^A-Za-z])USA/i,
+      /(^|[^A-Za-z])US[-_\s]?\d/i,
+      /(^|[^A-Za-z])US[-_\s]/i,
       /United\s*States/i,
-      /America/i,
-      /Los\s*Angeles/i,
-      /San\s*Jose/i,
-      /New\s*York/i
+      /\bAmerica\b/i,
+      /Los\s*Angeles|San\s*Jose|San\s*Francisco|San\s*Diego|Salt\s*Lake|New\s*York/i,
+      /Silicon\s*Valley|Las\s*Vegas|St\.?\s*Louis|Silicon\s*Valley/i,
+      /Seattle|Miami|Dallas|Ashburn|Chicago|Phoenix|Atlanta|Boston|Denver|Portland/i,
+      /Houston|Austin|Minneapolis|Detroit|Philadelphia|Washington|Honolulu|Anchorage/i,
+      /Charlotte|Nashville|Columbus|Cleveland|Orlando|Tampa|Oakland/i,
+      /(^|[^A-Za-z])(LAX|SFO|JFK|SJC|SEA|ORD|DFW|MIA|IAD|ATL|PHX|EWR|BOS|DEN|LAS|MSP|DTW|CLT|PHL|IAH|SAN|PDX|AUS|SLC|MCO|HNL|STL|RDU|BNA|MCI|SAT|OAK|BUR|SNA|SMF|SJU|PIT|BWI|DCA|MDW|TPA|CLE|CVG|IND|CMH|MKE|JAX|PBI|ONT|ANC)(?![A-Za-z])/i,
+      /洛杉矶|圣何塞|圣荷西|硅谷|西雅图|达拉斯|迈阿密|芝加哥|凤凰城|阿什本|纽约/i,
+      /亚特兰大|波士顿|丹佛|拉斯维加斯|波特兰|休斯顿|奥斯汀|费城|华盛顿/i,
+      /圣地亚哥|圣迭戈|檀香山|盐湖城|底特律|明尼阿波利斯|夏洛特|纳什维尔/i,
+      /圣路易斯|哥伦布|安克雷奇|奥兰多|坦帕|克利夫兰|奥克兰/i
 
     ],
 
 
     "加拿大": [
 
+      /🇨🇦/,
       /加拿大/i,
       /Canada/i,
       /Toronto/i,
@@ -1042,10 +1066,14 @@ const main = (config) => {
     ],
 
 
+    // 原来用裸 /UK/i 做子串匹配，会把 Ukraine、含 "uk" 的任意名字
+    // 误判成英国，这里改为词边界。
     "英国": [
 
+      /🇬🇧/,
       /英国/i,
-      /UK/i,
+      /\bUK\b/i,
+      /\bGB\b/i,
       /United\s*Kingdom/i,
       /England/i,
       /London/i,
@@ -1056,7 +1084,19 @@ const main = (config) => {
   };
 
 
+  // 按「名字中最先出现的地区标记」判定归属。
+  //
+  // 原实现是「按对象键顺序首次命中即返回」，而香港排在第一个键，
+  // 于是 `美国-HK-IEPL-01`、`US-HK-03`、`HK-US-01` 这类双标记节点
+  // 一律被判给香港，美国组因此经常缺节点甚至整组消失。
   function detectRegion(proxyName) {
+
+    const text = String(proxyName);
+
+    let bestRegion = "其他地区";
+    let bestIndex = Infinity;
+    let bestScore = 0;
+
 
     for (const region in regionPatterns) {
 
@@ -1073,19 +1113,54 @@ const main = (config) => {
       const patterns =
         regionPatterns[region];
 
+      let firstIndex = Infinity;
+      let score = 0;
+
 
       for (let i = 0; i < patterns.length; i++) {
 
-        if (patterns[i].test(proxyName)) {
-          return region;
+        const matched =
+          patterns[i].exec(text);
+
+        if (!matched) {
+          continue;
         }
+
+        score++;
+
+        if (matched.index < firstIndex) {
+          firstIndex = matched.index;
+        }
+
+      }
+
+
+      if (score === 0) {
+        continue;
+      }
+
+
+      // 先比位置：名字里出现得更早的地区优先；
+      // 位置相同时再比命中数量。
+      if (
+        firstIndex < bestIndex ||
+
+        (
+          firstIndex === bestIndex &&
+          score > bestScore
+        )
+      ) {
+
+        bestIndex = firstIndex;
+        bestScore = score;
+        bestRegion = region;
 
       }
 
     }
 
 
-    return "其他地区";
+    return bestRegion;
 
   }
 
@@ -1324,9 +1399,95 @@ const main = (config) => {
   }
 
 
+  // AI 组单独构造，不走 createBusinessGroup：
+  //
+  //   1. 类型用 fallback 而不是 select —— 顺序即优先级，只要首选健康
+  //      就固定用它，出口 IP 不因延迟波动而漂移；同时不依赖
+  //      profile.store-selected，地区组变动时不会弹回列表首项。
+  //   2. 美国排第一位，首次加载即默认走美国。
+  //   3. 不放入「国内直连」，避免误选后 ChatGPT 必然超时。
+  //   4. 不放入「香港」：OpenAI 不支持香港，而香港节点做连通性
+  //      健康检查是会通过的，属于「健康但不可用」。
+  function createAIGroup() {
+
+    const preferred = [
+      "美国",
+      "日本",
+      "新加坡",
+      "台湾",
+      "韩国"
+    ].filter((region) => {
+
+      return availableRegions.indexOf(region) !== -1;
+
+    });
+
+
+    const backup = availableRegions.filter((region) => {
+
+      return (
+        preferred.indexOf(region) === -1 &&
+        region !== "香港"
+      );
+
+    });
+
+
+    const proxies =
+      preferred.concat(backup);
+
+
+    // 极端情况：机场只有香港节点 —— 退回全部地区，避免生成空组。
+    if (proxies.length === 0) {
+
+      availableRegions.forEach((region) => {
+        proxies.push(region);
+      });
+
+    }
+
+
+    const group = {
+
+      "name": "AI",
+
+      "type": "fallback",
+
+      "proxies": proxies,
+
+      "url":
+        "https://www.gstatic.com/generate_204",
+
+      "interval": 300,
+
+      "timeout": 5000,
+
+      "lazy": true,
+
+      "max-failed-times": 3,
+
+      "expected-status": 204
+
+    };
+
+
+    const icon =
+      getGroupIcon("AI");
+
+
+    if (icon) {
+      group["icon"] = icon;
+    }
+
+
+    return group;
+
+  }
+
+
   const businessGroups = [
 
-    createBusinessGroup("AI"),
+    createAIGroup(),
 
     createBusinessGroup("YouTube"),
 
@@ -1440,7 +1601,134 @@ const main = (config) => {
 
     // --------------------------------------------------------------
     // AI
+    //
+    // 显式域名兜底：不依赖 geosite 数据与远程 rule-provider，
+    // 任一环节加载失败时也不会漏到 MATCH 走「一键代理」。
     // --------------------------------------------------------------
+
+    "DOMAIN-SUFFIX,openai.com,AI",
+
+    "DOMAIN-SUFFIX,chatgpt.com,AI",
+
+    "DOMAIN-SUFFIX,chat.com,AI",
+
+    "DOMAIN-SUFFIX,oaistatic.com,AI",
+
+    "DOMAIN-SUFFIX,oaiusercontent.com,AI",
+
+    "DOMAIN-SUFFIX,sora.com,AI",
+
+    "DOMAIN-SUFFIX,anthropic.com,AI",
+
+    "DOMAIN-SUFFIX,claude.ai,AI",
+
+    "DOMAIN-SUFFIX,muse.ai,AI",
+
+    // Gemini / Google DeepMind
+    //
+    // Gemini 挂在 google.com / googleapis.com 之下，若不在这里显式拦截，
+    // 会被后面的 GEOSITE,google 抢去「Google」组。以下域名取自官方
+    // geosite 的 google-deepmind 列表（google-gemini 已废弃并指向它）。
+
+    // DeepMind
+    "DOMAIN-SUFFIX,deepmind.com,AI",
+
+    "DOMAIN-SUFFIX,deepmind.google,AI",
+
+    // Generative Language API
+    "DOMAIN-SUFFIX,geller-pa.googleapis.com,AI",
+
+    "DOMAIN-SUFFIX,generativelanguage.googleapis.com,AI",
+
+    "DOMAIN-SUFFIX,proactivebackend-pa.googleapis.com,AI",
+
+    "DOMAIN-SUFFIX,robinfrontend-pa.googleapis.com,AI",
+
+    // Gemini 网页版 / AI Studio
+    "DOMAIN-SUFFIX,gemini.google,AI",
+
+    "DOMAIN-SUFFIX,gemini.google.com,AI",
+
+    "DOMAIN-SUFFIX,gemini.gstatic.com,AI",
+
+    "DOMAIN-SUFFIX,geminiweb-pa.clients.google.com,AI",
+
+    "DOMAIN-SUFFIX,geminiweb-pa.clients6.google.com,AI",
+
+    "DOMAIN-SUFFIX,bard.google.com,AI",
+
+    "DOMAIN-SUFFIX,ai.studio,AI",
+
+    "DOMAIN-SUFFIX,aistudio.google.com,AI",
+
+    "DOMAIN-SUFFIX,ai.google.dev,AI",
+
+    "DOMAIN-SUFFIX,generativeai.google,AI",
+
+    "DOMAIN-SUFFIX,makersuite.google.com,AI",
+
+    "DOMAIN-SUFFIX,alkalicore-pa.clients6.google.com,AI",
+
+    "DOMAIN-SUFFIX,alkalimakersuite-pa.clients6.google.com,AI",
+
+    "DOMAIN-SUFFIX,webchannel-alkalimakersuite-pa.clients6.google.com,AI",
+
+    // Gemini Code Assist
+    "DOMAIN-SUFFIX,cloudaicompanion.googleapis.com,AI",
+
+    "DOMAIN-SUFFIX,cloudcode-pa.googleapis.com,AI",
+
+    "DOMAIN-SUFFIX,daily-cloudcode-pa.googleapis.com,AI",
+
+    "DOMAIN-SUFFIX,aicode.googleapis.com,AI",
+
+    "DOMAIN-SUFFIX,aida.googleapis.com,AI",
+
+    // NotebookLM
+    "DOMAIN-SUFFIX,notebooklm-pa.googleapis.com,AI",
+
+    "DOMAIN-SUFFIX,notebooklm.googleapis.com,AI",
+
+    "DOMAIN-SUFFIX,labstailwind.pa.googleapis.com,AI",
+
+    "DOMAIN-SUFFIX,notebook.google,AI",
+
+    "DOMAIN-SUFFIX,notebook.google.com,AI",
+
+    "DOMAIN-SUFFIX,notebooklm.google,AI",
+
+    "DOMAIN-SUFFIX,notebooklm.google.com,AI",
+
+    // Jules / Labs / Flow / Opal
+    "DOMAIN-SUFFIX,jules.google,AI",
+
+    "DOMAIN-SUFFIX,jules.google.com,AI",
+
+    "DOMAIN-SUFFIX,labs.google,AI",
+
+    "DOMAIN-SUFFIX,labs.google.com,AI",
+
+    "DOMAIN-SUFFIX,flow.google,AI",
+
+    "DOMAIN-SUFFIX,flow.google.com,AI",
+
+    "DOMAIN-SUFFIX,aisandbox-pa.googleapis.com,AI",
+
+    "DOMAIN-SUFFIX,opal.google,AI",
+
+    "DOMAIN-SUFFIX,opal.google.com,AI",
+
+    // Antigravity
+    "DOMAIN-SUFFIX,antigravity-pa.googleapis.com,AI",
+
+    "DOMAIN-SUFFIX,antigravity.googleapis.com,AI",
+
+    "DOMAIN-SUFFIX,antigravity.google,AI",
+
+    "DOMAIN-SUFFIX,antigravity-unleash.goog,AI",
+
+    // Stitch
+    "DOMAIN-SUFFIX,stitch.withgoogle.com,AI",
 
     "RULE-SET,AI,AI",
 
