@@ -1585,30 +1585,30 @@ const main = (config) => {
   }
 
 
+  // 需要固定美国优先的业务组，共用这份地区优先级
+  const usFirstRegions = [
+    "美国",
+    "日本",
+    "新加坡",
+    "台湾",
+    "韩国"
+  ];
+
+
   const businessGroups = [
 
-    createFallbackGroup("AI", [
-      "美国",
-      "日本",
-      "新加坡",
-      "台湾",
-      "韩国"
-    ]),
+    // 美国优先：AI 服务（OpenAI 不支持香港）
+    createFallbackGroup("AI", usFirstRegions),
 
-    createBusinessGroup("YouTube"),
+    // 美国优先：YouTube（美区内容/趋势更全）
+    createFallbackGroup("YouTube", usFirstRegions),
 
     createBusinessGroup("Google"),
 
     createBusinessGroup("GitHub"),
 
-    // Netflix 地区锁最硬，与 AI 同样固定美国优先
-    createFallbackGroup("Netflix", [
-      "美国",
-      "日本",
-      "新加坡",
-      "台湾",
-      "韩国"
-    ]),
+    // 美国优先：Netflix（地区锁最硬）
+    createFallbackGroup("Netflix", usFirstRegions),
 
     createBusinessGroup("Spotify"),
 
@@ -1618,13 +1618,14 @@ const main = (config) => {
 
     createBusinessGroup("TikTok"),
 
-    createBusinessGroup("Twitter"),
+    // 美国优先：X / Twitter
+    createFallbackGroup("Twitter", usFirstRegions),
 
     createBusinessGroup("软件分流"),
 
     createBusinessGroup("Apple"),
 
-    createBusinessGroup("Microsoft"),
+    createBusinessGroup("Microsoft")
 
   ];
 
