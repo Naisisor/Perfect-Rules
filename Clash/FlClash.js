@@ -328,7 +328,7 @@ const main = (config) => {
 
     "软件分流": "Software.png",
 
-    "Twitter": "Twitter.png",
+    "X": "Twitter.png",
 
     "Netflix": "Netflix.png",
 
@@ -400,7 +400,7 @@ const main = (config) => {
 
     "软件分流": true,
 
-    "Twitter": true,
+    "X": true,
 
     "Netflix": true,
 
@@ -1618,8 +1618,8 @@ const main = (config) => {
 
     createBusinessGroup("TikTok"),
 
-    // 美国优先：X / Twitter
-    createFallbackGroup("Twitter", usFirstRegions),
+    // 美国优先：X（原 Twitter）
+    createFallbackGroup("X", usFirstRegions),
 
     createBusinessGroup("软件分流"),
 
@@ -1984,10 +1984,10 @@ const main = (config) => {
 
 
     // --------------------------------------------------------------
-    // Twitter / X
+    // X（原 Twitter）
     // --------------------------------------------------------------
 
-    "RULE-SET,Twitter,Twitter",
+    "RULE-SET,Twitter,X",
 
 
     // --------------------------------------------------------------
