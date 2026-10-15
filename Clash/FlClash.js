@@ -328,7 +328,7 @@ const main = (config) => {
 
     "软件分流": "Software.png",
 
-    "X": "Twitter.png",
+    "X": "X.png",
 
     "Netflix": "Netflix.png",
 
