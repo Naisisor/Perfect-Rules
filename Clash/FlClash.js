@@ -291,6 +291,22 @@ const main = (config) => {
   });
 
 
+  // 机场常在 proxies 里夹带信息类「伪节点」（剩余流量：100GB、到期时间、
+  // 官网 …）。它们不是真实代理，却会因为没有地区特征而被 detectRegion
+  // 判成「其他地区」，把该地区组变成一坨死节点 —— 而「其他地区」正是
+  // fallback 链的倒数第二环。同一个模式也用于过滤分组名（官网入口 之类）。
+  const junkPattern =
+    /官网|流量|剩余|到期|过期|套餐|订阅|重置|续费|网址|客服|公告|traffic|expire|expired|subscription|reset|official|website/i;
+
+
+  // 只含真实节点的名单，供建地区组与改写机场自动选择组使用
+  const validProxyNames = proxyNames.filter((name) => {
+
+    return !junkPattern.test(name);
+
+  });
+
+
   // ================================================================
   // 8. Original airport proxy groups
   // ================================================================
@@ -634,6 +650,17 @@ const main = (config) => {
       }
 
 
+      // 机场的信息类伪节点不算真实节点，
+      // 否则「全是垃圾节点的组」会被误判成「全部节点组」。
+      if (junkPattern.test(item)) {
+
+        result.unknown++;
+
+        return;
+
+      }
+
+
       // Actual proxy node
 
       if (proxyNames.indexOf(item) !== -1) {
@@ -823,8 +850,11 @@ const main = (config) => {
 
     group.type = "url-test";
 
+    // 只用真实节点：机场本身已经过滤干净时，不能在这里被塞回垃圾节点
     group.proxies =
-      proxyNames.slice();
+      validProxyNames.length > 0
+        ? validProxyNames.slice()
+        : proxyNames.slice();
 
     group.url =
       "https://www.gstatic.com/generate_204";
@@ -867,11 +897,6 @@ const main = (config) => {
   // 因此不再需要单独生成 finalPreservedGroups。
   // ================================================================
 
-  // 机场常见的信息 / 广告类分组，不能作为默认出口选择器。
-  const junkGroupPattern =
-    /官网|流量|剩余|到期|过期|套餐|订阅|重置|续费|网址|客服|公告|traffic|expire|expired|subscription|reset|official|website/i;
-
-
   function findDefaultAirportGroup() {
 
     const candidates = [];
@@ -889,7 +914,7 @@ const main = (config) => {
 
 
       // 跳过信息 / 广告类分组
-      if (junkGroupPattern.test(name)) {
+      if (junkPattern.test(name)) {
         return;
       }
 
@@ -1308,12 +1333,24 @@ const main = (config) => {
     }
 
 
+    const name =
+      String(proxy.name);
+
+
+    // 跳过机场下发的信息类伪节点。
+    // 少了这一步，它们会因为没有地区特征而全部堆进「其他地区」，
+    // 把那一组变成纯死节点，而它正是 fallback 链的倒数第二环。
+    if (junkPattern.test(name)) {
+      return;
+    }
+
+
     const region =
-      detectRegion(String(proxy.name));
+      detectRegion(name);
 
 
     regionNodes[region].push(
-      proxy.name
+      name
     );
 
   });
@@ -1550,13 +1587,21 @@ const main = (config) => {
     }
 
 
-    // 极端情况：机场只有香港节点 —— 退回全部地区，避免生成空组。
+    // 极端情况兜底，避免生成空候选组（mihomo 会因此拒绝整份配置）：
+    //   1) 机场只有香港节点      -> 退回全部地区
+    //   2) 连地区组都没生成（订阅里没有任何有效真实节点）
+    //                           -> 退回「一键代理」
     if (proxies.length === 0) {
 
       availableRegions.forEach((region) => {
         proxies.push(region);
       });
 
+    }
+
+
+    if (proxies.length === 0) {
+      proxies.push("一键代理");
     }
 
 
