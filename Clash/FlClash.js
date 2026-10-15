@@ -390,6 +390,12 @@ const main = (config) => {
 
     "网络检测": true,
 
+    "广告拦截": true,
+
+    "软件分流": true,
+
+    "Twitter": true,
+
     "Netflix": true,
 
     "Spotify": true,
@@ -1024,7 +1030,16 @@ const main = (config) => {
       createRuleProvider("microsoft.yaml"),
 
     "NetworkTest":
-      createRuleProvider("network-test.yaml")
+      createRuleProvider("network-test.yaml"),
+
+    "Ads":
+      createRuleProvider("ads.yaml"),
+
+    "Software":
+      createRuleProvider("software.yaml"),
+
+    "Twitter":
+      createRuleProvider("twitter.yaml")
 
   };
 
@@ -1593,6 +1608,10 @@ const main = (config) => {
 
     createBusinessGroup("TikTok"),
 
+    createBusinessGroup("Twitter"),
+
+    createBusinessGroup("软件分流"),
+
     createBusinessGroup("Apple"),
 
     createBusinessGroup("Microsoft"),
@@ -1624,6 +1643,22 @@ const main = (config) => {
   if (networkTestIcon) {
     networkTestGroup["icon"] = networkTestIcon;
   }
+
+
+  // 广告拦截：默认 REJECT，可在界面上切换为 DIRECT。
+  // 规则表里排在很靠前的位置，拦截优先于其他所有分流。
+  const adBlockGroup = {
+
+    "name": "广告拦截",
+
+    "type": "select",
+
+    "proxies": [
+      "REJECT",
+      "DIRECT"
+    ]
+
+  };
 
 
   // ================================================================
@@ -1660,6 +1695,8 @@ const main = (config) => {
       .concat([
 
         domesticDirectGroup,
+
+        adBlockGroup,
 
         mainSelector
 
@@ -1710,6 +1747,23 @@ const main = (config) => {
     "IP-CIDR,172.16.0.0/12,DIRECT,no-resolve",
 
     "IP-CIDR,192.168.0.0/16,DIRECT,no-resolve",
+
+
+    // --------------------------------------------------------------
+    // Software（按进程分流）
+    //
+    // 覆盖 Discord / Steam / Epic Games / WhatsApp。
+    // 依赖 find-process-mode，本脚本已设为 "always"。
+    // --------------------------------------------------------------
+
+    "RULE-SET,Software,软件分流",
+
+
+    // --------------------------------------------------------------
+    // Ads
+    // --------------------------------------------------------------
+
+    "RULE-SET,Ads,广告拦截",
 
 
     // --------------------------------------------------------------
@@ -1907,6 +1961,13 @@ const main = (config) => {
     // --------------------------------------------------------------
 
     "RULE-SET,TikTok,TikTok",
+
+
+    // --------------------------------------------------------------
+    // Twitter / X
+    // --------------------------------------------------------------
+
+    "RULE-SET,Twitter,Twitter",
 
 
     // --------------------------------------------------------------
