@@ -827,6 +827,33 @@ const main = (config) => {
     delete copied["hidden"];
 
 
+    // 把伪节点（剩余流量 / 到期时间 / 官网 …）挪到候选末尾。
+    //
+    // select 组的默认项就是候选第一项：伪节点若被机场排在组内最前，
+    // 就会成为该组的默认出口（「网络检测」跟随机场默认选择器走时
+    // 也会被一起带偏）。挪到末尾既保留机场的信息展示，
+    // 又保证默认项一定是真实节点。
+    if (Array.isArray(copied.proxies)) {
+
+      const realItems = [];
+      const junkItems = [];
+
+      copied.proxies.forEach((item) => {
+
+        if (junkPattern.test(String(item))) {
+          junkItems.push(item);
+        } else {
+          realItems.push(item);
+        }
+
+      });
+
+
+      copied.proxies = realItems.concat(junkItems);
+
+    }
+
+
     preservedGroups.push(copied);
 
   });
