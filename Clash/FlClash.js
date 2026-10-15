@@ -838,29 +838,117 @@ const main = (config) => {
 
 
   // ================================================================
-  // 18. Remove managed groups from preserved groups
+  // 18. Find airport default manual selector
+  //
+  // 网络检测 组需要跟随「机场自己的默认手动选择器」，而不是固定落在
+  // 某个地区，否则用 ipinfo.io 之类站点自查出口 IP 时会看到错的节点：
+  //
+  //   网络检测
+  //       ↓
+  //   机场默认选择器
+  //       ↓
+  //   用户选中的节点
+  //
+  // 不要硬编码具体机场组名，这里按特征自动挑选。
+  //
+  // 注：preservedGroups 在第 16 节已经过滤掉 managedGroups，
+  // 因此不再需要单独生成 finalPreservedGroups。
   // ================================================================
 
-  const finalPreservedGroups = [];
+  // 机场常见的信息 / 广告类分组，不能作为默认出口选择器。
+  const junkGroupPattern =
+    /官网|流量|剩余|到期|过期|套餐|订阅|重置|续费|网址|客服|公告|traffic|expire|expired|subscription|reset|official|website/i;
 
 
-  preservedGroups.forEach((group) => {
+  function findDefaultAirportGroup() {
 
-    if (
+    const candidates = [];
 
-      group &&
 
-      group.name &&
+    originalGroups.forEach((group) => {
 
-      !managedGroups[group.name]
+      if (!group || !group.name) {
+        return;
+      }
 
-    ) {
 
-      finalPreservedGroups.push(group);
+      const name =
+        String(group.name);
+
+
+      // 跳过信息 / 广告类分组
+      if (junkGroupPattern.test(name)) {
+        return;
+      }
+
+
+      // 跳过 Perfect-Rules 托管组
+      if (managedGroups[name]) {
+        return;
+      }
+
+
+      // 跳过自动选择组
+      if (isAutoSelectGroup(name)) {
+        return;
+      }
+
+
+      // 跳过故障转移组
+      if (isFailoverGroup(name)) {
+        return;
+      }
+
+
+      // 跳过明显的业务分组
+      if (isBusinessGroupName(name)) {
+        return;
+      }
+
+
+      if (group.type !== "select") {
+        return;
+      }
+
+
+      const composition =
+        getProxyComposition(group);
+
+
+      if (composition.actualNodes < 2) {
+        return;
+      }
+
+
+      candidates.push(group);
+
+    });
+
+
+    // 优先选「全部节点」型手动选择器，
+    // 例如 机场名 / 节点 / 全部节点 这类结构。
+    for (let i = 0; i < candidates.length; i++) {
+
+      if (isAllNodesGroup(candidates[i])) {
+        return candidates[i].name;
+      }
 
     }
 
-  });
+
+    // 否则退回第一个符合条件的 select 组
+    if (candidates.length > 0) {
+      return candidates[0].name;
+    }
+
+
+    return null;
+
+  }
+
+
+  const defaultAirportGroup =
+    findDefaultAirportGroup();
 
 
   // ================================================================
@@ -1509,9 +1597,33 @@ const main = (config) => {
 
     createBusinessGroup("Microsoft"),
 
-    createBusinessGroup("网络检测")
-
   ];
+
+
+  // 网络检测 单独构造：跟随机场默认手动选择器，
+  // 让测速 / 查 IP 站点反映你实际选中的出口节点。
+  // 机场无可用手动选择器时，退回「一键代理」。
+  const networkTestGroup = {
+
+    "name": "网络检测",
+
+    "type": "select",
+
+    "proxies":
+      defaultAirportGroup
+        ? [defaultAirportGroup]
+        : ["一键代理"]
+
+  };
+
+
+  const networkTestIcon =
+    getGroupIcon("网络检测");
+
+
+  if (networkTestIcon) {
+    networkTestGroup["icon"] = networkTestIcon;
+  }
 
 
   // ================================================================
@@ -1520,6 +1632,8 @@ const main = (config) => {
   //   Airport basic groups
   //          ↓
   //   Perfect-Rules service groups
+  //          ↓
+  //   Network Test
   //          ↓
   //   Perfect-Rules region groups
   //          ↓
@@ -1531,9 +1645,15 @@ const main = (config) => {
 
   config["proxy-groups"] =
 
-    finalPreservedGroups
+    preservedGroups
 
       .concat(businessGroups)
+
+      .concat([
+
+        networkTestGroup
+
+      ])
 
       .concat(regionGroups)
 
