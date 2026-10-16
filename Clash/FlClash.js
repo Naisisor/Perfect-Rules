@@ -986,23 +986,22 @@ const main = (config) => {
       }
 
 
+      // 必须同时是「全部节点」型，才会被第 16 节保留。
+      //
+      // 这里不能用更宽松的条件：放宽后会选到一个最终不在输出里的组名，
+      // 「网络检测」引用它就成了悬空引用，mihomo 会拒绝整份配置。
+      if (!isAllNodesGroup(group)) {
+        return;
+      }
+
+
       candidates.push(group);
 
     });
 
 
-    // 优先选「全部节点」型手动选择器，
+    // 优先取「全部节点」型手动选择器，
     // 例如 机场名 / 节点 / 全部节点 这类结构。
-    for (let i = 0; i < candidates.length; i++) {
-
-      if (isAllNodesGroup(candidates[i])) {
-        return candidates[i].name;
-      }
-
-    }
-
-
-    // 否则退回第一个符合条件的 select 组
     if (candidates.length > 0) {
       return candidates[0].name;
     }
@@ -1413,6 +1412,39 @@ const main = (config) => {
 
 
   // ================================================================
+  // 23.1 Drop airport region-named groups
+  //
+  // 方案 B：丢弃机场自建的地区命名组（「🇭🇰 香港节点」「日本节点」
+  // 「美国专线」…）。脚本已经按地区生成了标准组，这类组只是重复，
+  // 而且成员往往不如脚本过滤得干净。
+  //
+  // 判定用的是「组名」而非成员 —— 「九云」「自动选择」「故障转移」
+  // 「全部节点」这类非地区命名会原样保留。
+  //
+  // 必须放在这里：detectRegion 依赖 regionPatterns，而 regionPatterns
+  // 是 const，早于本节调用会触发 TDZ。
+  // ================================================================
+
+  const finalPreservedGroups =
+    preservedGroups.filter((group) => {
+
+      return detectRegion(String(group.name)) === "其他地区";
+
+    });
+
+
+  // 安全阀：选出的默认选择器必须真的存在于最终输出里。
+  // 否则「网络检测」会引用一个不存在的组名，mihomo 会拒绝整份配置。
+  const usableDefaultAirportGroup =
+    defaultAirportGroup &&
+    finalPreservedGroups.some((group) => {
+      return group.name === defaultAirportGroup;
+    })
+      ? defaultAirportGroup
+      : null;
+
+
+  // ================================================================
   // 24. Region order
   // ================================================================
 
@@ -1772,8 +1804,8 @@ const main = (config) => {
     "type": "select",
 
     "proxies":
-      defaultAirportGroup
-        ? [defaultAirportGroup]
+      usableDefaultAirportGroup
+        ? [usableDefaultAirportGroup]
         : ["一键代理"]
 
   };
@@ -1832,7 +1864,7 @@ const main = (config) => {
 
   config["proxy-groups"] =
 
-    preservedGroups
+    finalPreservedGroups
 
       .concat(businessGroups)
 
