@@ -374,7 +374,9 @@ const main = (config) => {
 
     "加拿大": "Other.png",
 
-    "英国": "Other.png",
+    "英国": "United_Kingdom.png",
+
+    "德国": "Germany.png",
 
     "其他地区": "Other.png"
 
@@ -447,6 +449,8 @@ const main = (config) => {
     "加拿大": true,
 
     "英国": true,
+
+    "德国": true,
 
     "其他地区": true
 
@@ -1238,6 +1242,31 @@ const main = (config) => {
       /London/i,
       /Manchester/i
 
+    ],
+
+
+    // 德国。注意只能用 /\bDE\b/，裸 /DE/i 会把 Sweden 也判成德国。
+    "德国": [
+
+      /🇩🇪/,
+      /德国/i,
+      /德國/i,
+      /\bDE\b/i,
+      /(^|[^A-Za-z])DE[-_\s]?\d/i,
+      /Germany/i,
+      /Frankfurt/i,
+      /Falkenstein/i,
+      /Nuremberg|Nürnberg/i,
+      /Berlin/i,
+      /Munich|München/i,
+      /Dusseldorf|Düsseldorf/i,
+      /Hamburg/i,
+      /Stuttgart/i,
+      /Cologne|Köln/i,
+      /法兰克福|法兰/i,
+      /柏林/i,
+      /慕尼黑/i
+
     ]
 
   };
@@ -1346,6 +1375,8 @@ const main = (config) => {
 
     "英国": [],
 
+    "德国": [],
+
     "其他地区": []
 
   };
@@ -1402,6 +1433,8 @@ const main = (config) => {
     "加拿大",
 
     "英国",
+
+    "德国",
 
     "其他地区"
 
