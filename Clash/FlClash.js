@@ -1920,8 +1920,15 @@ const main = (config) => {
     // Gemini / Google DeepMind
     //
     // Gemini 挂在 google.com / googleapis.com 之下，若不在这里显式拦截，
-    // 会被后面的 GEOSITE,google 抢去「Google」组。以下域名取自官方
-    // geosite 的 google-deepmind 列表（google-gemini 已废弃并指向它）。
+    // 规则集或 geosite 故障时会被后面的 GEOSITE,google 抢去「Google」组。
+    // 以下域名取自官方 geosite 的 google-deepmind 列表。
+    //
+    // 只保留「日常使用 Gemini / AI Studio / Generative Language API」
+    // 必需的域名。google-deepmind 里的长尾附加产品已精简掉：
+    //   Gemini Code Assist、NotebookLM、Jules、Labs、Flow、Opal、
+    //   Antigravity、Stitch
+    // 正常场景下这些仍由 GEOSITE,category-ai-!cn 兜住，
+    // 仅规则集/geosite 故障时不再计入。需要时按名字从上游列表加回即可。
 
     // DeepMind
     "DOMAIN-SUFFIX,deepmind.com,AI",
@@ -1965,63 +1972,6 @@ const main = (config) => {
     "DOMAIN-SUFFIX,alkalimakersuite-pa.clients6.google.com,AI",
 
     "DOMAIN-SUFFIX,webchannel-alkalimakersuite-pa.clients6.google.com,AI",
-
-    // Gemini Code Assist
-    "DOMAIN-SUFFIX,cloudaicompanion.googleapis.com,AI",
-
-    "DOMAIN-SUFFIX,cloudcode-pa.googleapis.com,AI",
-
-    "DOMAIN-SUFFIX,daily-cloudcode-pa.googleapis.com,AI",
-
-    "DOMAIN-SUFFIX,aicode.googleapis.com,AI",
-
-    "DOMAIN-SUFFIX,aida.googleapis.com,AI",
-
-    // NotebookLM
-    "DOMAIN-SUFFIX,notebooklm-pa.googleapis.com,AI",
-
-    "DOMAIN-SUFFIX,notebooklm.googleapis.com,AI",
-
-    "DOMAIN-SUFFIX,labstailwind.pa.googleapis.com,AI",
-
-    "DOMAIN-SUFFIX,notebook.google,AI",
-
-    "DOMAIN-SUFFIX,notebook.google.com,AI",
-
-    "DOMAIN-SUFFIX,notebooklm.google,AI",
-
-    "DOMAIN-SUFFIX,notebooklm.google.com,AI",
-
-    // Jules / Labs / Flow / Opal
-    "DOMAIN-SUFFIX,jules.google,AI",
-
-    "DOMAIN-SUFFIX,jules.google.com,AI",
-
-    "DOMAIN-SUFFIX,labs.google,AI",
-
-    "DOMAIN-SUFFIX,labs.google.com,AI",
-
-    "DOMAIN-SUFFIX,flow.google,AI",
-
-    "DOMAIN-SUFFIX,flow.google.com,AI",
-
-    "DOMAIN-SUFFIX,aisandbox-pa.googleapis.com,AI",
-
-    "DOMAIN-SUFFIX,opal.google,AI",
-
-    "DOMAIN-SUFFIX,opal.google.com,AI",
-
-    // Antigravity
-    "DOMAIN-SUFFIX,antigravity-pa.googleapis.com,AI",
-
-    "DOMAIN-SUFFIX,antigravity.googleapis.com,AI",
-
-    "DOMAIN-SUFFIX,antigravity.google,AI",
-
-    "DOMAIN-SUFFIX,antigravity-unleash.goog,AI",
-
-    // Stitch
-    "DOMAIN-SUFFIX,stitch.withgoogle.com,AI",
 
     "RULE-SET,AI,AI",
 
