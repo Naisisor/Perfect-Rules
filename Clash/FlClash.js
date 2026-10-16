@@ -1570,9 +1570,14 @@ const main = (config) => {
   }
 
 
-  // 地区锁较硬的服务用 fallback 组：顺序即优先级，首选健康就固定用它，
-  // 出口 IP 不因延迟波动而漂移；也不依赖 profile.store-selected，
-  // 地区组变动时不会像 select 组那样弹回列表首项。
+  // 按地区优先级构造业务组：候选顺序 = 优先级，第一项即默认出口。
+  //
+  // groupType 决定是否自动故障转移：
+  //   "fallback" —— 首选不健康时自动降级到下一个地区。适合流媒体
+  //                 （换区只影响片库，不影响会话）。
+  //   "select"   —— 手动选择，无论首选是否健康都不自动切换。
+  //                 适合 AI：自动降级会悄悄更换出口 IP，
+  //                 OpenAI 的风控会看到 IP 跳变，反而更容易触发验证。
   //
   // preferredRegions 按优先级排列；不在列表里的地区作为后备。
   //
@@ -1580,7 +1585,7 @@ const main = (config) => {
   //   AI 不启用 —— OpenAI 不支持香港，而香港节点做连通性健康检查
   //   是会通过的，属于「健康但不可用」；
   //   YouTube / Netflix / X 启用 —— 香港对这三者完全可用且延迟最低。
-  function createFallbackGroup(name, preferredRegions, includeHongKong) {
+  function createPriorityGroup(name, preferredRegions, groupType, includeHongKong) {
 
     const preferred = preferredRegions.filter((region) => {
 
@@ -1634,24 +1639,31 @@ const main = (config) => {
 
       "name": name,
 
-      "type": "fallback",
+      "type": groupType,
 
-      "proxies": proxies,
-
-      "url":
-        "https://www.gstatic.com/generate_204",
-
-      "interval": 300,
-
-      "timeout": 5000,
-
-      "lazy": true,
-
-      "max-failed-times": 3,
-
-      "expected-status": 204
+      "proxies": proxies
 
     };
+
+
+    // select 由用户手动选择，不需要健康检查参数；
+    // fallback 依赖健康检查决定何时降级，必须带上这一组。
+    if (groupType === "fallback") {
+
+      group["url"] =
+        "https://www.gstatic.com/generate_204";
+
+      group["interval"] = 300;
+
+      group["timeout"] = 5000;
+
+      group["lazy"] = true;
+
+      group["max-failed-times"] = 3;
+
+      group["expected-status"] = 204;
+
+    }
 
 
     const icon =
@@ -1681,17 +1693,21 @@ const main = (config) => {
   const businessGroups = [
 
     // 美国优先：AI 服务（OpenAI 不支持香港，末尾不补香港）
-    createFallbackGroup("AI", usFirstRegions),
+    //
+    // 用 select 而不是 fallback：美国节点故障时不自动转移，避免出口 IP
+    // 悄悄漂移到日本/新加坡 —— OpenAI 的风控会看到 IP 跳变，反而更容易
+    // 触发人机验证。故障时由用户自行在界面上切换。
+    createPriorityGroup("AI", usFirstRegions, "select"),
 
     // 美国优先：YouTube（香港对 YouTube 可用，作末尾兜底）
-    createFallbackGroup("YouTube", usFirstRegions, true),
+    createPriorityGroup("YouTube", usFirstRegions, "fallback", true),
 
     createBusinessGroup("Google"),
 
     createBusinessGroup("GitHub"),
 
     // 美国优先：Netflix（香港对 Netflix 可用，作末尾兜底）
-    createFallbackGroup("Netflix", usFirstRegions, true),
+    createPriorityGroup("Netflix", usFirstRegions, "fallback", true),
 
     createBusinessGroup("Spotify"),
 
@@ -1702,7 +1718,7 @@ const main = (config) => {
     createBusinessGroup("TikTok"),
 
     // 美国优先：X（香港对 X 可用，作末尾兜底）
-    createFallbackGroup("X", usFirstRegions, true),
+    createPriorityGroup("X", usFirstRegions, "fallback", true),
 
     createBusinessGroup("软件分流"),
 
