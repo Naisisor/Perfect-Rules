@@ -416,13 +416,27 @@ const main = (config) => {
   };
 
 
-  function getGroupIcon(name) {
+  // 未单独配置图标的组使用的兜底图标
+  const fallbackIconURL =
+    iconBaseURL + "Other.png";
 
-    if (!groupIcons[name]) {
-      return undefined;
+
+  // useFallback 为 true 时，未在 groupIcons 里登记的名字返回默认图标，
+  // 而不是 undefined —— 用于地区组：以后新增地区（法国、澳大利亚…）
+  // 即使忘了配图标，也能拿到一个可用的兜底图标。
+  function getGroupIcon(name, useFallback) {
+
+    if (groupIcons[name]) {
+      return iconBaseURL + groupIcons[name];
     }
 
-    return iconBaseURL + groupIcons[name];
+
+    if (useFallback) {
+      return fallbackIconURL;
+    }
+
+
+    return undefined;
 
   }
 
@@ -1612,8 +1626,9 @@ const main = (config) => {
     };
 
 
+    // 第二个参数 true = 未单独配置图标的地区使用默认图标兜底
     const icon =
-      getGroupIcon(region);
+      getGroupIcon(region, true);
 
 
     if (icon) {
