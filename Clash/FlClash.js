@@ -357,6 +357,10 @@ const main = (config) => {
 
     "一键代理": "Proxy.png",
 
+    "自动-香港优先": "Proxy.png",
+
+    "自动-美国优先": "Proxy.png",
+
     "国内直连": "China.png",
 
     "AI": "AI.png",
@@ -430,6 +434,10 @@ const main = (config) => {
   const managedGroups = {
 
     "一键代理": true,
+
+    "自动-香港优先": true,
+
+    "自动-美国优先": true,
 
     "国内直连": true,
 
@@ -1627,6 +1635,131 @@ const main = (config) => {
 
 
   // ================================================================
+  // 25.1 Auto-failover chains
+  //
+  // 自动降级链（fallback）：作为各业务组的第一个候选 / 默认选项。
+  //
+  // 这一层是「故障转移」，不是「测速择优」—— 按顺序取第一个可用的地区组，
+  // 不比较延迟，所以只要前一个地区还有健康节点就不会换地区，跨地区出口
+  // 稳定；地区内部才是 url-test 按延迟择优。
+  //
+  // 必须在这里创建：后面的「一键代理」与业务组都会引用它，晚于它们会触发
+  // const 的 TDZ。
+  // ================================================================
+
+  function createAutoFailoverGroup(name, preferredRegions, excludeHongKong) {
+
+    const preferred = preferredRegions.filter((region) => {
+
+      return availableRegions.indexOf(region) !== -1;
+
+    });
+
+
+    const rest = availableRegions.filter((region) => {
+
+      return (
+        preferred.indexOf(region) === -1 &&
+        !(excludeHongKong && region === "香港")
+      );
+
+    });
+
+
+    const proxies =
+      preferred.concat(rest);
+
+
+    // 极端情况兜底：没有任何地区组时指向 DIRECT，避免空组
+    if (proxies.length === 0) {
+      proxies.push("DIRECT");
+    }
+
+
+    const group = {
+
+      "name": name,
+
+      "type": "fallback",
+
+      "proxies": proxies,
+
+      "url":
+        "https://www.gstatic.com/generate_204",
+
+      "interval": 600,
+
+      "timeout": 5000,
+
+      "lazy": true,
+
+      "max-failed-times": 3,
+
+      "expected-status": 204
+
+    };
+
+
+    const icon =
+      getGroupIcon(name);
+
+
+    if (icon) {
+      group["icon"] = icon;
+    }
+
+
+    return group;
+
+  }
+
+
+  // 只有存在地区组时才创建降级链；否则业务组不注入（避免循环引用）
+  const autoGroups = [];
+
+  if (availableRegions.length > 0) {
+
+    // 香港优先：给无地区锁的服务用
+    autoGroups.push(createAutoFailoverGroup(
+      "自动-香港优先",
+      [
+        "香港",
+        "台湾",
+        "日本",
+        "新加坡",
+        "韩国",
+        "美国",
+        "加拿大",
+        "英国",
+        "德国",
+        "荷兰",
+        "爱沙尼亚"
+      ]
+    ));
+
+
+    // 美国优先：给 AI 用（不含香港 —— OpenAI 不支持）
+    autoGroups.push(createAutoFailoverGroup(
+      "自动-美国优先",
+      [
+        "美国",
+        "日本",
+        "新加坡",
+        "台湾",
+        "韩国",
+        "加拿大",
+        "英国",
+        "德国",
+        "荷兰",
+        "爱沙尼亚"
+      ],
+      true
+    ));
+
+  }
+
+
+  // ================================================================
   // 26. Domestic Direct
   // ================================================================
 
@@ -1659,16 +1792,25 @@ const main = (config) => {
   // 27. One-click Proxy
   // ================================================================
 
+  const mainCandidates =
+    availableRegions.concat([
+      "国内直连"
+    ]);
+
+
+  // 首项放自动降级链 —— select 的默认项就是第一项
+  if (autoGroups.length > 0) {
+    mainCandidates.unshift("自动-香港优先");
+  }
+
+
   const mainSelector = {
 
     "name": "一键代理",
 
     "type": "select",
 
-    "proxies":
-      availableRegions.concat([
-        "国内直连"
-      ])
+    "proxies": mainCandidates
 
   };
 
@@ -1689,7 +1831,19 @@ const main = (config) => {
   // 28. Service groups
   // ================================================================
 
-  function createBusinessGroup(name) {
+  function createBusinessGroup(name, autoChain) {
+
+    const candidates =
+      availableRegions.concat([
+        "国内直连"
+      ]);
+
+
+    // 把自动降级链放在第一位 —— select 组的默认项就是第一项
+    if (autoChain && autoGroups.length > 0) {
+      candidates.unshift(autoChain);
+    }
+
 
     const group = {
 
@@ -1697,10 +1851,7 @@ const main = (config) => {
 
       "type": "select",
 
-      "proxies":
-        availableRegions.concat([
-          "国内直连"
-        ])
+      "proxies": candidates
 
     };
 
@@ -1762,6 +1913,12 @@ const main = (config) => {
     }
 
 
+    // 首项放「自动-美国优先」降级链 —— select 的默认项就是第一项
+    if (autoGroups.length > 0) {
+      proxies.unshift("自动-美国优先");
+    }
+
+
     const group = {
 
       "name": "AI",
@@ -1787,38 +1944,37 @@ const main = (config) => {
   }
 
 
-  // 需要固定美国优先的业务组，共用这份地区优先级
+  // 业务组：首项均为自动降级链，往下是手动可选的地区
+  const hkChain = "自动-香港优先";
+
   const businessGroups = [
 
-    // AI 服务：美国优先，手动选择（OpenAI 不支持香港）
+    // AI 服务：美国优先链 + 手动选择（OpenAI 不支持香港）
     createAIGroup(),
 
-    // YouTube：回到原始逻辑 —— select，候选按地区顺序，默认香港
-    createBusinessGroup("YouTube"),
+    createBusinessGroup("YouTube", hkChain),
 
-    createBusinessGroup("Google"),
+    createBusinessGroup("Google", hkChain),
 
-    createBusinessGroup("GitHub"),
+    createBusinessGroup("GitHub", hkChain),
 
-    // Netflix：回到原始逻辑 —— select，候选按地区顺序，默认香港
-    createBusinessGroup("Netflix"),
+    createBusinessGroup("Netflix", hkChain),
 
-    createBusinessGroup("Spotify"),
+    createBusinessGroup("Spotify", hkChain),
 
-    createBusinessGroup("Steam"),
+    createBusinessGroup("Steam", hkChain),
 
-    createBusinessGroup("Telegram"),
+    createBusinessGroup("Telegram", hkChain),
 
-    createBusinessGroup("TikTok"),
+    createBusinessGroup("TikTok", hkChain),
 
-    // X：回到原始逻辑 —— select，候选按地区顺序，默认香港
-    createBusinessGroup("X"),
+    createBusinessGroup("X", hkChain),
 
-    createBusinessGroup("软件分流"),
+    createBusinessGroup("软件分流", hkChain),
 
-    createBusinessGroup("Apple"),
+    createBusinessGroup("Apple", hkChain),
 
-    createBusinessGroup("Microsoft")
+    createBusinessGroup("Microsoft", hkChain)
 
   ];
 
@@ -1894,6 +2050,8 @@ const main = (config) => {
   config["proxy-groups"] =
 
     finalPreservedGroups
+
+      .concat(autoGroups)
 
       .concat(businessGroups)
 
