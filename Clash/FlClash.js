@@ -181,7 +181,10 @@ const main = (config) => {
 
     "device": "FlClash",
 
-    "stack": "gvisor",
+    // 注意：stack 与 strict-route 由 FlClash 客户端自己控制
+    // （实测会被覆盖成 stack=mixed、strict-route=false），
+    // 写在这里不生效，故不再声明，避免造成「已配置」的错觉。
+    // 需要调整请到 FlClash 的 TUN 设置里改。
 
     "dns-hijack": [
       "0.0.0.0:53"
@@ -190,8 +193,6 @@ const main = (config) => {
     "auto-route": true,
 
     "auto-detect-interface": false,
-
-    "strict-route": true,
 
     "mtu": 1280,
 
@@ -276,18 +277,46 @@ const main = (config) => {
   // 7. Original airport proxies
   // ================================================================
 
-  const originalProxies = Array.isArray(config["proxies"])
+  const rawProxies = Array.isArray(config["proxies"])
     ? config["proxies"]
     : [];
+
+
+  // 去重 + 剔除无名节点。
+  // mihomo 遇到同名节点或空名节点会拒绝整份配置，而机场订阅偶尔会
+  // 下发重复条目，这里保留首次出现的那条并在写回前过滤掉其余。
+  const seenProxyNames = new Set();
+
+  const originalProxies = rawProxies.filter((proxy) => {
+
+    if (!proxy || !proxy.name) {
+      return false;
+    }
+
+
+    const name =
+      String(proxy.name);
+
+
+    if (seenProxyNames.has(name)) {
+      return false;
+    }
+
+
+    seenProxyNames.add(name);
+
+    return true;
+
+  });
+
+
+  config["proxies"] = originalProxies;
+
 
   const proxyNames = [];
 
   originalProxies.forEach((proxy) => {
-
-    if (proxy && proxy.name) {
-      proxyNames.push(proxy.name);
-    }
-
+    proxyNames.push(proxy.name);
   });
 
 
@@ -791,12 +820,26 @@ const main = (config) => {
 
   // ================================================================
   // 16. Preserve airport basic groups
+  //
+  // PRESERVE_AIRPORT_GROUPS = false：完全丢弃机场自建分组，输出只包含
+  // 本脚本生成的组。这样分组结构完全可预测，也避免了机场的
+  // 「自动选择」把全部节点再测一遍（移动端健康检查翻倍的主因）。
+  //
+  // 想保留机场的自动选择 / 故障转移 / 全部节点组时，把开关改成 true。
+  // 「网络检测」会自动适配：没有机场组时退回「一键代理」。
   // ================================================================
+
+  const PRESERVE_AIRPORT_GROUPS = false;
 
   const preservedGroups = [];
 
 
   originalGroups.forEach((group) => {
+
+    if (!PRESERVE_AIRPORT_GROUPS) {
+      return;
+    }
+
 
     if (!group || !group.name) {
       return;
@@ -1266,6 +1309,36 @@ const main = (config) => {
       /柏林/i,
       /慕尼黑/i
 
+    ],
+
+
+    // 荷兰。常见机房：阿姆斯特丹 AMS / Hetzner。
+    "荷兰": [
+
+      /🇳🇱/,
+      /荷兰/i,
+      /荷蘭/i,
+      /\bNL\b/i,
+      /(^|[^A-Za-z])NL[-_\s]?\d/i,
+      /Netherlands|Holland/i,
+      /Amsterdam/i,
+      /阿姆斯特丹/i
+
+    ],
+
+
+    // 爱沙尼亚。常见机房：塔林 TLL / Hetzner。
+    "爱沙尼亚": [
+
+      /🇪🇪/,
+      /爱沙尼亚/i,
+      /愛沙尼亞/i,
+      /\bEE\b/i,
+      /(^|[^A-Za-z])EE[-_\s]?\d/i,
+      /Estonia/i,
+      /Tallinn/i,
+      /塔林/i
+
     ]
 
   };
@@ -1376,6 +1449,10 @@ const main = (config) => {
 
     "德国": [],
 
+    "荷兰": [],
+
+    "爱沙尼亚": [],
+
     "其他地区": []
 
   };
@@ -1468,6 +1545,10 @@ const main = (config) => {
 
     "德国",
 
+    "荷兰",
+
+    "爱沙尼亚",
+
     "其他地区"
 
   ];
@@ -1505,7 +1586,10 @@ const main = (config) => {
       "url":
         "https://www.gstatic.com/generate_204",
 
-      "interval": 300,
+      // 600s：地区组多、成员多时，300s 会让健康检查非常密集
+      // （实测 600+ 节点时约 4.5 次/秒、每天 38 万次请求）。
+      // 配合 lazy:true，空载时还会进一步降频。
+      "interval": 600,
 
       "timeout": 5000,
 
@@ -1635,24 +1719,23 @@ const main = (config) => {
   }
 
 
-  // 按地区优先级构造业务组：候选顺序 = 优先级，第一项即默认出口。
+  // AI 组单独构造：美国优先 + 手动选择（select）。
   //
-  // groupType 决定是否自动故障转移：
-  //   "fallback" —— 首选不健康时自动降级到下一个地区。适合流媒体
-  //                 （换区只影响片库，不影响会话）。
-  //   "select"   —— 手动选择，无论首选是否健康都不自动切换。
-  //                 适合 AI：自动降级会悄悄更换出口 IP，
-  //                 OpenAI 的风控会看到 IP 跳变，反而更容易触发验证。
+  // 用 select 而不是 fallback —— 美国节点故障时不自动转移。自动降级会
+  // 悄悄更换出口 IP，OpenAI 的风控会看到 IP 跳变，反而更容易触发验证。
   //
-  // preferredRegions 按优先级排列；不在列表里的地区作为后备。
-  //
-  // includeHongKong 控制是否把「香港」作为最后兜底：
-  //   AI 不启用 —— OpenAI 不支持香港，而香港节点做连通性健康检查
-  //   是会通过的，属于「健康但不可用」；
-  //   YouTube / Netflix / X 启用 —— 香港对这三者完全可用且延迟最低。
-  function createPriorityGroup(name, preferredRegions, groupType, includeHongKong) {
+  // 候选：美国 > 日本 > 新加坡 > 台湾 > 韩国 > 其余地区。
+  // 不含香港（OpenAI 不支持，而香港节点做连通性检查会通过，属
+  // 「健康但不可用」），也不含「国内直连」。
+  function createAIGroup() {
 
-    const preferred = preferredRegions.filter((region) => {
+    const preferred = [
+      "美国",
+      "日本",
+      "新加坡",
+      "台湾",
+      "韩国"
+    ].filter((region) => {
 
       return availableRegions.indexOf(region) !== -1;
 
@@ -1673,28 +1756,7 @@ const main = (config) => {
       preferred.concat(backup);
 
 
-    // 香港作为最后兜底
-    if (
-      includeHongKong &&
-      availableRegions.indexOf("香港") !== -1
-    ) {
-      proxies.push("香港");
-    }
-
-
-    // 极端情况兜底，避免生成空候选组（mihomo 会因此拒绝整份配置）：
-    //   1) 机场只有香港节点      -> 退回全部地区
-    //   2) 连地区组都没生成（订阅里没有任何有效真实节点）
-    //                           -> 退回「一键代理」
-    if (proxies.length === 0) {
-
-      availableRegions.forEach((region) => {
-        proxies.push(region);
-      });
-
-    }
-
-
+    // 极端情况兜底，避免生成空候选组（mihomo 会因此拒绝整份配置）
     if (proxies.length === 0) {
       proxies.push("一键代理");
     }
@@ -1702,37 +1764,17 @@ const main = (config) => {
 
     const group = {
 
-      "name": name,
+      "name": "AI",
 
-      "type": groupType,
+      "type": "select",
 
       "proxies": proxies
 
     };
 
 
-    // select 由用户手动选择，不需要健康检查参数；
-    // fallback 依赖健康检查决定何时降级，必须带上这一组。
-    if (groupType === "fallback") {
-
-      group["url"] =
-        "https://www.gstatic.com/generate_204";
-
-      group["interval"] = 300;
-
-      group["timeout"] = 5000;
-
-      group["lazy"] = true;
-
-      group["max-failed-times"] = 3;
-
-      group["expected-status"] = 204;
-
-    }
-
-
     const icon =
-      getGroupIcon(name);
+      getGroupIcon("AI");
 
 
     if (icon) {
@@ -1746,23 +1788,10 @@ const main = (config) => {
 
 
   // 需要固定美国优先的业务组，共用这份地区优先级
-  const usFirstRegions = [
-    "美国",
-    "日本",
-    "新加坡",
-    "台湾",
-    "韩国"
-  ];
-
-
   const businessGroups = [
 
-    // 美国优先：AI 服务（OpenAI 不支持香港，末尾不补香港）
-    //
-    // 用 select 而不是 fallback：美国节点故障时不自动转移，避免出口 IP
-    // 悄悄漂移到日本/新加坡 —— OpenAI 的风控会看到 IP 跳变，反而更容易
-    // 触发人机验证。故障时由用户自行在界面上切换。
-    createPriorityGroup("AI", usFirstRegions, "select"),
+    // AI 服务：美国优先，手动选择（OpenAI 不支持香港）
+    createAIGroup(),
 
     // YouTube：回到原始逻辑 —— select，候选按地区顺序，默认香港
     createBusinessGroup("YouTube"),
