@@ -1764,8 +1764,8 @@ const main = (config) => {
     // 触发人机验证。故障时由用户自行在界面上切换。
     createPriorityGroup("AI", usFirstRegions, "select"),
 
-    // 美国优先：YouTube（香港对 YouTube 可用，作末尾兜底）
-    createPriorityGroup("YouTube", usFirstRegions, "fallback", true),
+    // YouTube：回到原始逻辑 —— select，候选按地区顺序，默认香港
+    createBusinessGroup("YouTube"),
 
     createBusinessGroup("Google"),
 
@@ -1782,8 +1782,8 @@ const main = (config) => {
 
     createBusinessGroup("TikTok"),
 
-    // 美国优先：X（香港对 X 可用，作末尾兜底）
-    createPriorityGroup("X", usFirstRegions, "fallback", true),
+    // X：回到原始逻辑 —— select，候选按地区顺序，默认香港
+    createBusinessGroup("X"),
 
     createBusinessGroup("软件分流"),
 
