@@ -1771,8 +1771,8 @@ const main = (config) => {
 
     createBusinessGroup("GitHub"),
 
-    // 美国优先：Netflix（香港对 Netflix 可用，作末尾兜底）
-    createPriorityGroup("Netflix", usFirstRegions, "fallback", true),
+    // Netflix：回到原始逻辑 —— select，候选按地区顺序，默认香港
+    createBusinessGroup("Netflix"),
 
     createBusinessGroup("Spotify"),
 
