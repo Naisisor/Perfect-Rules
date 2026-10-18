@@ -1997,19 +1997,41 @@ const main = (config) => {
   ];
 
 
-  // 网络检测 单独构造：跟随机场默认手动选择器，
-  // 让测速 / 查 IP 站点反映你实际选中的出口节点。
-  // 机场无可用手动选择器时，退回「默认代理」。
+  // 网络检测：一个「出口 IP 自查」的诊断钩子。
+  //
+  // ipinfo.io / ipify / ipleak 等站点命中这里，所以你在这些站上看到的
+  // 出口 IP，就是本组当前选中项的出口。把候选做成「所有组」，就可以
+  // 随时切到某个业务组，确认它实际走的是哪个地区。
+  //
+  // 候选顺序：
+  //   1) 机场默认手动选择器（仅在 PRESERVE_AIRPORT_GROUPS = true 时存在）
+  //   2) 默认代理（默认项 —— 即未指定流量的出口）
+  //   3) 全部业务组
+  //   4) 全部地区组
+  const networkTestCandidates = [];
+
+  if (usableDefaultAirportGroup) {
+    networkTestCandidates.push(usableDefaultAirportGroup);
+  }
+
+  networkTestCandidates.push("默认代理");
+
+  businessGroups.forEach((group) => {
+    networkTestCandidates.push(group.name);
+  });
+
+  regionGroups.forEach((group) => {
+    networkTestCandidates.push(group.name);
+  });
+
+
   const networkTestGroup = {
 
     "name": "网络检测",
 
     "type": "select",
 
-    "proxies":
-      usableDefaultAirportGroup
-        ? [usableDefaultAirportGroup]
-        : ["默认代理"]
+    "proxies": networkTestCandidates
 
   };
 
