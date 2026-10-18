@@ -355,7 +355,7 @@ const main = (config) => {
 
   const groupIcons = {
 
-    "一键代理": "Proxy.png",
+    "默认代理": "Proxy.png",
 
     "自动-香港优先": "Proxy.png",
 
@@ -447,7 +447,7 @@ const main = (config) => {
 
   const managedGroups = {
 
-    "一键代理": true,
+    "默认代理": true,
 
     "自动-香港优先": true,
 
@@ -848,7 +848,7 @@ const main = (config) => {
   // 「自动选择」把全部节点再测一遍（移动端健康检查翻倍的主因）。
   //
   // 想保留机场的自动选择 / 故障转移 / 全部节点组时，把开关改成 true。
-  // 「网络检测」会自动适配：没有机场组时退回「一键代理」。
+  // 「网络检测」会自动适配：没有机场组时退回「默认代理」。
   // ================================================================
 
   const PRESERVE_AIRPORT_GROUPS = false;
@@ -1658,7 +1658,7 @@ const main = (config) => {
   // 不比较延迟，所以只要前一个地区还有健康节点就不会换地区，跨地区出口
   // 稳定；地区内部才是 url-test 按延迟择优。
   //
-  // 必须在这里创建：后面的「一键代理」与业务组都会引用它，晚于它们会触发
+  // 必须在这里创建：后面的「默认代理」与业务组都会引用它，晚于它们会触发
   // const 的 TDZ。
   // ================================================================
 
@@ -1821,7 +1821,7 @@ const main = (config) => {
 
   const mainSelector = {
 
-    "name": "一键代理",
+    "name": "默认代理",
 
     "type": "select",
 
@@ -1831,7 +1831,7 @@ const main = (config) => {
 
 
   const mainIcon =
-    getGroupIcon("一键代理");
+    getGroupIcon("默认代理");
 
 
   if (mainIcon) {
@@ -1924,7 +1924,7 @@ const main = (config) => {
 
     // 极端情况兜底，避免生成空候选组（mihomo 会因此拒绝整份配置）
     if (proxies.length === 0) {
-      proxies.push("一键代理");
+      proxies.push("默认代理");
     }
 
 
@@ -1999,7 +1999,7 @@ const main = (config) => {
 
   // 网络检测 单独构造：跟随机场默认手动选择器，
   // 让测速 / 查 IP 站点反映你实际选中的出口节点。
-  // 机场无可用手动选择器时，退回「一键代理」。
+  // 机场无可用手动选择器时，退回「默认代理」。
   const networkTestGroup = {
 
     "name": "网络检测",
@@ -2009,7 +2009,7 @@ const main = (config) => {
     "proxies":
       usableDefaultAirportGroup
         ? [usableDefaultAirportGroup]
-        : ["一键代理"]
+        : ["默认代理"]
 
   };
 
@@ -2067,9 +2067,10 @@ const main = (config) => {
 
   config["proxy-groups"] =
 
-    finalPreservedGroups
+    // 默认代理放第一位：它是所有未指定流量的出口，最常需要查看 / 切换
+    [mainSelector]
 
-      .concat(autoGroups)
+      .concat(finalPreservedGroups)
 
       .concat(businessGroups)
 
@@ -2085,11 +2086,13 @@ const main = (config) => {
 
         domesticDirectGroup,
 
-        adBlockGroup,
+        adBlockGroup
 
-        mainSelector
+      ])
 
-      ]);
+      // 自动降级链放最末尾：它们是各业务组内部的默认选项，
+      // 正常情况下不需要直接操作
+      .concat(autoGroups);
 
 
   // ================================================================
@@ -2166,7 +2169,7 @@ const main = (config) => {
     // AI
     //
     // 显式域名兜底：不依赖 geosite 数据与远程 rule-provider，
-    // 任一环节加载失败时也不会漏到 MATCH 走「一键代理」。
+    // 任一环节加载失败时也不会漏到 MATCH 走「默认代理」。
     // --------------------------------------------------------------
 
     "DOMAIN-SUFFIX,openai.com,AI",
@@ -2345,7 +2348,7 @@ const main = (config) => {
     // Final
     // --------------------------------------------------------------
 
-    "MATCH,一键代理"
+    "MATCH,默认代理"
 
   ];
 
