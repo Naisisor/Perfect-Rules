@@ -375,8 +375,6 @@ const main = (config) => {
 
     "广告拦截": "Ads.png",
 
-    "软件分流": "Software.png",
-
     "X": "X.png",
 
     "Netflix": "Netflix.png",
@@ -466,8 +464,6 @@ const main = (config) => {
     "网络检测": true,
 
     "广告拦截": true,
-
-    "软件分流": true,
 
     "X": true,
 
@@ -1158,9 +1154,6 @@ const main = (config) => {
 
     "Ads":
       createRuleProvider("ads.yaml"),
-
-    "Software":
-      createRuleProvider("software.yaml"),
 
     "Twitter":
       createRuleProvider("twitter.yaml")
@@ -1988,8 +1981,6 @@ const main = (config) => {
 
     createBusinessGroup("X", hkChain),
 
-    createBusinessGroup("软件分流", hkChain),
-
     createBusinessGroup("Apple", hkChain),
 
     createBusinessGroup("Microsoft", hkChain)
@@ -2161,16 +2152,6 @@ const main = (config) => {
     "IP-CIDR,172.16.0.0/12,DIRECT,no-resolve",
 
     "IP-CIDR,192.168.0.0/16,DIRECT,no-resolve",
-
-
-    // --------------------------------------------------------------
-    // Software（按进程分流）
-    //
-    // 覆盖 Discord / Steam / Epic Games / WhatsApp。
-    // 依赖 find-process-mode，本脚本已设为 "always"。
-    // --------------------------------------------------------------
-
-    "RULE-SET,Software,软件分流",
 
 
     // --------------------------------------------------------------
