@@ -371,8 +371,6 @@ const main = (config) => {
 
     "GitHub": "GitHub.png",
 
-    "网络检测": "Network-test.png",
-
     "广告拦截": "Ads.png",
 
     "X": "X.png",
@@ -460,8 +458,6 @@ const main = (config) => {
     "Google": true,
 
     "GitHub": true,
-
-    "网络检测": true,
 
     "广告拦截": true,
 
@@ -844,7 +840,6 @@ const main = (config) => {
   // 「自动选择」把全部节点再测一遍（移动端健康检查翻倍的主因）。
   //
   // 想保留机场的自动选择 / 故障转移 / 全部节点组时，把开关改成 true。
-  // 「网络检测」会自动适配：没有机场组时退回「默认代理」。
   // ================================================================
 
   const PRESERVE_AIRPORT_GROUPS = false;
@@ -895,8 +890,7 @@ const main = (config) => {
     // 彻底剔除伪节点（剩余流量 / 到期时间 / 官网 …）。
     //
     // 它们不是真实代理：留在候选里既可能成为 select 组的默认出口
-    // （select 的默认项就是第一项，「网络检测」跟随机场默认选择器走时
-    // 会被一起带偏），也会污染 url-test / fallback 的健康检查。
+    // （select 的默认项就是第一项），也会污染 url-test / fallback 的健康检查。
     //
     // 过滤后若组内一个真实节点都不剩，则整组丢弃 ——
     // 避免生成空候选组导致 mihomo 拒绝整份配置。
@@ -970,114 +964,6 @@ const main = (config) => {
 
 
   // ================================================================
-  // 18. Find airport default manual selector
-  //
-  // 网络检测 组需要跟随「机场自己的默认手动选择器」，而不是固定落在
-  // 某个地区，否则用 ipinfo.io 之类站点自查出口 IP 时会看到错的节点：
-  //
-  //   网络检测
-  //       ↓
-  //   机场默认选择器
-  //       ↓
-  //   用户选中的节点
-  //
-  // 不要硬编码具体机场组名，这里按特征自动挑选。
-  //
-  // 注：preservedGroups 在第 16 节已经过滤掉 managedGroups，
-  // 因此不再需要单独生成 finalPreservedGroups。
-  // ================================================================
-
-  function findDefaultAirportGroup() {
-
-    const candidates = [];
-
-
-    originalGroups.forEach((group) => {
-
-      if (!group || !group.name) {
-        return;
-      }
-
-
-      const name =
-        String(group.name);
-
-
-      // 跳过信息 / 广告类分组
-      if (junkPattern.test(name)) {
-        return;
-      }
-
-
-      // 跳过 Perfect-Rules 托管组
-      if (managedGroups[name]) {
-        return;
-      }
-
-
-      // 跳过自动选择组
-      if (isAutoSelectGroup(name)) {
-        return;
-      }
-
-
-      // 跳过故障转移组
-      if (isFailoverGroup(name)) {
-        return;
-      }
-
-
-      // 跳过明显的业务分组
-      if (isBusinessGroupName(name)) {
-        return;
-      }
-
-
-      if (group.type !== "select") {
-        return;
-      }
-
-
-      const composition =
-        getProxyComposition(group);
-
-
-      if (composition.actualNodes < 2) {
-        return;
-      }
-
-
-      // 必须同时是「全部节点」型，才会被第 16 节保留。
-      //
-      // 这里不能用更宽松的条件：放宽后会选到一个最终不在输出里的组名，
-      // 「网络检测」引用它就成了悬空引用，mihomo 会拒绝整份配置。
-      if (!isAllNodesGroup(group)) {
-        return;
-      }
-
-
-      candidates.push(group);
-
-    });
-
-
-    // 优先取「全部节点」型手动选择器，
-    // 例如 机场名 / 节点 / 全部节点 这类结构。
-    if (candidates.length > 0) {
-      return candidates[0].name;
-    }
-
-
-    return null;
-
-  }
-
-
-  const defaultAirportGroup =
-    findDefaultAirportGroup();
-
-
-  // ================================================================
   // 19. Remote Rule Provider base URL
   // ================================================================
 
@@ -1148,9 +1034,6 @@ const main = (config) => {
 
     "Microsoft":
       createRuleProvider("microsoft.yaml"),
-
-    "NetworkTest":
-      createRuleProvider("network-test.yaml"),
 
     "Ads":
       createRuleProvider("ads.yaml"),
@@ -1523,17 +1406,6 @@ const main = (config) => {
       return detectRegion(String(group.name)) === "其他地区";
 
     });
-
-
-  // 安全阀：选出的默认选择器必须真的存在于最终输出里。
-  // 否则「网络检测」会引用一个不存在的组名，mihomo 会拒绝整份配置。
-  const usableDefaultAirportGroup =
-    defaultAirportGroup &&
-    finalPreservedGroups.some((group) => {
-      return group.name === defaultAirportGroup;
-    })
-      ? defaultAirportGroup
-      : null;
 
 
   // ================================================================
@@ -1988,54 +1860,6 @@ const main = (config) => {
   ];
 
 
-  // 网络检测：一个「出口 IP 自查」的诊断钩子。
-  //
-  // ipinfo.io / ipify / ipleak 等站点命中这里，所以你在这些站上看到的
-  // 出口 IP，就是本组当前选中项的出口。把候选做成「所有组」，就可以
-  // 随时切到某个业务组，确认它实际走的是哪个地区。
-  //
-  // 候选顺序：
-  //   1) 机场默认手动选择器（仅在 PRESERVE_AIRPORT_GROUPS = true 时存在）
-  //   2) 默认代理（默认项 —— 即未指定流量的出口）
-  //   3) 全部业务组
-  //   4) 全部地区组
-  const networkTestCandidates = [];
-
-  if (usableDefaultAirportGroup) {
-    networkTestCandidates.push(usableDefaultAirportGroup);
-  }
-
-  networkTestCandidates.push("默认代理");
-
-  businessGroups.forEach((group) => {
-    networkTestCandidates.push(group.name);
-  });
-
-  regionGroups.forEach((group) => {
-    networkTestCandidates.push(group.name);
-  });
-
-
-  const networkTestGroup = {
-
-    "name": "网络检测",
-
-    "type": "select",
-
-    "proxies": networkTestCandidates
-
-  };
-
-
-  const networkTestIcon =
-    getGroupIcon("网络检测");
-
-
-  if (networkTestIcon) {
-    networkTestGroup["icon"] = networkTestIcon;
-  }
-
-
   // 广告拦截：默认 REJECT，可在界面上切换为 DIRECT。
   // 规则表里排在很靠前的位置，拦截优先于其他所有分流。
   const adBlockGroup = {
@@ -2087,12 +1911,6 @@ const main = (config) => {
 
       .concat(businessGroups)
 
-      .concat([
-
-        networkTestGroup
-
-      ])
-
       .concat(regionGroups)
 
       .concat([
@@ -2113,7 +1931,6 @@ const main = (config) => {
   //
   // Rule Provider order:
   //
-  // NetworkTest
   // AI
   // YouTube
   // Google
@@ -2159,13 +1976,6 @@ const main = (config) => {
     // --------------------------------------------------------------
 
     "RULE-SET,Ads,广告拦截",
-
-
-    // --------------------------------------------------------------
-    // Network Test
-    // --------------------------------------------------------------
-
-    "RULE-SET,NetworkTest,网络检测",
 
 
     // --------------------------------------------------------------
