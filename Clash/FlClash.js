@@ -357,7 +357,7 @@ const main = (config) => {
 
     "默认代理": "Proxy.png",
 
-    "自动-香港优先": "Proxy.png",
+    "自动-日本优先": "Proxy.png",
 
     "自动-美国优先": "Proxy.png",
 
@@ -445,7 +445,7 @@ const main = (config) => {
 
     "默认代理": true,
 
-    "自动-香港优先": true,
+    "自动-日本优先": true,
 
     "自动-美国优先": true,
 
@@ -1599,13 +1599,13 @@ const main = (config) => {
 
   if (availableRegions.length > 0) {
 
-    // 香港优先：给无地区锁的服务用
+    // 日本优先：给无地区锁的服务用
     autoGroups.push(createAutoFailoverGroup(
-      "自动-香港优先",
+      "自动-日本优先",
       [
+        "日本",
         "香港",
         "台湾",
-        "日本",
         "新加坡",
         "韩国",
         "美国",
@@ -1680,7 +1680,7 @@ const main = (config) => {
 
   // 首项放自动降级链 —— select 的默认项就是第一项
   if (autoGroups.length > 0) {
-    mainCandidates.unshift("自动-香港优先");
+    mainCandidates.unshift("自动-日本优先");
   }
 
 
@@ -1828,34 +1828,34 @@ const main = (config) => {
 
 
   // 业务组：首项均为自动降级链，往下是手动可选的地区
-  const hkChain = "自动-香港优先";
+  const defaultChain = "自动-日本优先";
 
   const businessGroups = [
 
     // AI 服务：美国优先链 + 手动选择（OpenAI 不支持香港）
     createAIGroup(),
 
-    createBusinessGroup("YouTube", hkChain),
+    createBusinessGroup("YouTube", defaultChain),
 
-    createBusinessGroup("Google", hkChain),
+    createBusinessGroup("Google", defaultChain),
 
-    createBusinessGroup("GitHub", hkChain),
+    createBusinessGroup("GitHub", defaultChain),
 
-    createBusinessGroup("Netflix", hkChain),
+    createBusinessGroup("Netflix", defaultChain),
 
-    createBusinessGroup("Spotify", hkChain),
+    createBusinessGroup("Spotify", defaultChain),
 
-    createBusinessGroup("Steam", hkChain),
+    createBusinessGroup("Steam", defaultChain),
 
-    createBusinessGroup("Telegram", hkChain),
+    createBusinessGroup("Telegram", defaultChain),
 
-    createBusinessGroup("TikTok", hkChain),
+    createBusinessGroup("TikTok", defaultChain),
 
-    createBusinessGroup("X", hkChain),
+    createBusinessGroup("X", defaultChain),
 
-    createBusinessGroup("Apple", hkChain),
+    createBusinessGroup("Apple", defaultChain),
 
-    createBusinessGroup("Microsoft", hkChain)
+    createBusinessGroup("Microsoft", defaultChain)
 
   ];
 
