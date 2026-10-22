@@ -1,7 +1,7 @@
 function main(config) {
 
   // ================================================================
-  // Clash Mi / Mihomo Perfect-Rules v1.7
+  // Clash Mi / Mihomo Perfect-Rules v2.0
   //
   // Architecture:
   //
@@ -14,15 +14,6 @@ function main(config) {
   //   Perfect-Rules Service Groups
   //          ↓
   //   Remote Rule Providers
-  //
-  // JS:
-  //   Responsible for configuration architecture
-  //
-  // GitHub Rule Providers:
-  //   Responsible for actual routing rules
-  //
-  // Network Test:
-  //   Follow airport's default manual selector
   //
   // ================================================================
 
@@ -41,6 +32,7 @@ function main(config) {
 
   config["log-level"] = "error";
 
+  // Disable IPv6 to prevent IPv4 / IPv6 exit mismatch.
   config["ipv6"] = false;
 
   config["allow-lan"] = false;
@@ -59,11 +51,8 @@ function main(config) {
   // ================================================================
 
   config["profile"] = {
-
     "store-selected": true,
-
     "store-fake-ip": true
-
   };
 
 
@@ -86,7 +75,6 @@ function main(config) {
     "fake-ip-range": "172.19.0.1/16",
 
     "fake-ip-filter": [
-
       "+.lan",
       "+.local",
       "+.localhost",
@@ -110,67 +98,50 @@ function main(config) {
       "www.msftconnecttest.com",
 
       "www.msftncsi.com"
-
     ],
 
     "default-nameserver": [
-
       "223.5.5.5",
       "119.29.29.29"
-
     ],
 
     "nameserver": [
-
       "https://dns.alidns.com/dns-query",
       "https://doh.pub/dns-query"
-
     ],
 
     "nameserver-policy": {
 
       "geosite:cn": [
-
         "https://dns.alidns.com/dns-query",
         "https://doh.pub/dns-query"
-
       ],
 
       "geosite:private": [
-
         "https://dns.alidns.com/dns-query",
         "https://doh.pub/dns-query"
-
       ],
 
       "geolocation-!cn": [
-
         "https://cloudflare-dns.com/dns-query",
         "https://dns.google/dns-query"
-
       ]
 
     },
 
     "proxy-server-nameserver": [
-
       "https://dns.alidns.com/dns-query",
       "https://doh.pub/dns-query"
-
     ],
 
     "direct-nameserver": [
-
       "https://dns.alidns.com/dns-query",
       "https://doh.pub/dns-query"
-
     ],
 
     "fallback": [
-
       "https://cloudflare-dns.com/dns-query",
       "https://dns.google/dns-query"
-
     ],
 
     "fallback-filter": {
@@ -180,13 +151,10 @@ function main(config) {
       "geoip-code": "CN",
 
       "geosite": [
-
         "gfw"
-
       ],
 
       "domain": [
-
         "+.google.com",
         "+.googleapis.com",
         "+.googlevideo.com",
@@ -196,7 +164,6 @@ function main(config) {
         "+.chatgpt.com",
         "+.anthropic.com",
         "+.claude.ai"
-
       ]
 
     }
@@ -214,26 +181,23 @@ function main(config) {
 
     "device": "Clash Mi",
 
-    "stack": "gvisor",
+    // 注意：stack 与 strict-route 由 FlClash 客户端自己控制
+    // （实测会被覆盖成 stack=mixed、strict-route=false），
+    // 写在这里不生效，故不再声明，避免造成「已配置」的错觉。
+    // 需要调整请到 FlClash 的 TUN 设置里改。
 
     "dns-hijack": [
-
       "0.0.0.0:53"
-
     ],
 
     "auto-route": true,
 
     "auto-detect-interface": false,
 
-    "strict-route": true,
-
     "mtu": 1280,
 
     "inet4-address": [
-
       "172.19.0.1/30"
-
     ],
 
     "auto-redirect": false,
@@ -260,45 +224,31 @@ function main(config) {
     "sniff": {
 
       "HTTP": {
-
         "ports": [
-
           80,
           "8080-8880"
-
         ]
-
       },
 
       "TLS": {
-
         "ports": [
-
           443,
           8443
-
         ]
-
       },
 
       "QUIC": {
-
         "ports": [
-
           443,
           8443
-
         ]
-
       }
 
     },
 
     "skip-domain": [
-
       "+.push.apple.com",
       "+.mijia.cloud"
-
     ]
 
   };
@@ -327,20 +277,61 @@ function main(config) {
   // 7. Original airport proxies
   // ================================================================
 
-  var originalProxies = Array.isArray(config["proxies"])
+  var rawProxies = Array.isArray(config["proxies"])
     ? config["proxies"]
     : [];
 
 
+  // 去重 + 剔除无名节点。
+  // mihomo 遇到同名节点或空名节点会拒绝整份配置，而机场订阅偶尔会
+  // 下发重复条目，这里保留首次出现的那条并在写回前过滤掉其余。
+  var seenProxyNames = Object.create(null);
+
+  var originalProxies = rawProxies.filter(function (proxy) {
+
+    if (!proxy || !proxy.name) {
+      return false;
+    }
+
+
+    var name =
+      String(proxy.name);
+
+
+    if (seenProxyNames[name]) {
+      return false;
+    }
+
+
+    seenProxyNames[name] = true;
+
+    return true;
+
+  });
+
+
+  config["proxies"] = originalProxies;
+
+
   var proxyNames = [];
 
-  originalProxies.forEach(function(proxy) {
+  originalProxies.forEach(function (proxy) {
+    proxyNames.push(proxy.name);
+  });
 
-    if (proxy && proxy.name) {
 
-      proxyNames.push(proxy.name);
+  // 机场常在 proxies 里夹带信息类「伪节点」（剩余流量：100GB、到期时间、
+  // 官网 …）。它们不是真实代理，却会因为没有地区特征而被 detectRegion
+  // 判成「其他地区」，把该地区组变成一坨死节点 —— 而「其他地区」正是
+  // fallback 链的倒数第二环。同一个模式也用于过滤分组名（官网入口 之类）。
+  var junkPattern =
+    /官网|流量|剩余|到期|过期|套餐|订阅|重置|续费|网址|客服|公告|traffic|expire|expired|subscription|reset|official|website/i;
 
-    }
+
+  // 只含真实节点的名单，供建地区组与改写机场自动选择组使用
+  var validProxyNames = proxyNames.filter(function (name) {
+
+    return !junkPattern.test(name);
 
   });
 
@@ -359,12 +350,18 @@ function main(config) {
   // ================================================================
 
   var iconBaseURL =
-    "https://cdn.jsdelivr.net/gh/n0de-sudo/Perfect-Rules@main/Clash/icons/";
+    "https://cdn.jsdelivr.net/gh/Naisisor/Perfect-Rules@main/Clash/icons/";
 
 
   var groupIcons = {
 
-    "一键代理": "Proxy.png",
+    "默认代理": "Proxy.png",
+
+    "自动-最快": "Proxy.png",
+
+    "自动-香港优先": "Proxy.png",
+
+    "自动-美国优先": "Proxy.png",
 
     "国内直连": "China.png",
 
@@ -376,7 +373,9 @@ function main(config) {
 
     "GitHub": "GitHub.png",
 
-    "网络检测": "Network-test.png",
+    "广告拦截": "Ads.png",
+
+    "X": "X.png",
 
     "Netflix": "Netflix.png",
 
@@ -406,22 +405,36 @@ function main(config) {
 
     "加拿大": "Other.png",
 
-    "英国": "Other.png",
+    "英国": "United_Kingdom.png",
+
+    "德国": "Germany.png",
 
     "其他地区": "Other.png"
 
   };
 
 
-  function getGroupIcon(name) {
+  // 未单独配置图标的组使用的兜底图标
+  var fallbackIconURL =
+    iconBaseURL + "Other.png";
 
-    if (!groupIcons[name]) {
 
-      return undefined;
+  // useFallback 为 true 时，未在 groupIcons 里登记的名字返回默认图标，
+  // 而不是 undefined —— 用于地区组：以后新增地区（法国、澳大利亚…）
+  // 即使忘了配图标，也能拿到一个可用的兜底图标。
+  function getGroupIcon(name, useFallback) {
 
+    if (groupIcons[name]) {
+      return iconBaseURL + groupIcons[name];
     }
 
-    return iconBaseURL + groupIcons[name];
+
+    if (useFallback) {
+      return fallbackIconURL;
+    }
+
+
+    return undefined;
 
   }
 
@@ -432,7 +445,13 @@ function main(config) {
 
   var managedGroups = {
 
-    "一键代理": true,
+    "默认代理": true,
+
+    "自动-最快": true,
+
+    "自动-香港优先": true,
+
+    "自动-美国优先": true,
 
     "国内直连": true,
 
@@ -444,7 +463,9 @@ function main(config) {
 
     "GitHub": true,
 
-    "网络检测": true,
+    "广告拦截": true,
+
+    "X": true,
 
     "Netflix": true,
 
@@ -475,6 +496,8 @@ function main(config) {
     "加拿大": true,
 
     "英国": true,
+
+    "德国": true,
 
     "其他地区": true
 
@@ -509,83 +532,57 @@ function main(config) {
   function isBusinessGroupName(name) {
 
     if (!name) {
-
       return false;
-
     }
 
     var text = String(name);
 
-
     var patterns = [
 
       /ai/i,
-
       /openai/i,
-
       /chatgpt/i,
-
       /claude/i,
-
       /gemini/i,
 
       /netflix/i,
-
       /disney/i,
-
       /disney\+/i,
 
       /youtube/i,
-
       /google/i,
-
       /github/i,
 
       /spotify/i,
-
       /steam/i,
-
       /tiktok/i,
-
       /telegram/i,
 
       /twitter/i,
-
       /x\.com/i,
-
       /facebook/i,
-
       /instagram/i,
 
       /流媒体/i,
-
       /媒体/i,
-
       /影音/i,
-
       /视频/i,
 
       /游戏/i,
-
       /游戏专用/i,
 
       /机场专用/i,
-
       /节点分流/i
 
     ];
 
-
     for (var i = 0; i < patterns.length; i++) {
 
       if (patterns[i].test(text)) {
-
         return true;
-
       }
 
     }
-
 
     return false;
 
@@ -599,11 +596,8 @@ function main(config) {
   function isAutoSelectGroup(name) {
 
     if (!name) {
-
       return false;
-
     }
-
 
     return (
 
@@ -627,11 +621,8 @@ function main(config) {
   function isFailoverGroup(name) {
 
     if (!name) {
-
       return false;
-
     }
-
 
     return (
 
@@ -653,11 +644,8 @@ function main(config) {
   function isAllNodeName(name) {
 
     if (!name) {
-
       return false;
-
     }
-
 
     return (
 
@@ -694,11 +682,8 @@ function main(config) {
 
 
     if (
-
       !group ||
-
       !Array.isArray(group.proxies)
-
     ) {
 
       return result;
@@ -706,18 +691,28 @@ function main(config) {
     }
 
 
-    result.total =
-      group.proxies.length;
+    result.total = group.proxies.length;
 
 
-    group.proxies.forEach(function(item) {
+    group.proxies.forEach(function (item) {
 
       if (!item) {
+        return;
+      }
+
+
+      // 机场的信息类伪节点不算真实节点，
+      // 否则「全是垃圾节点的组」会被误判成「全部节点组」。
+      if (junkPattern.test(item)) {
+
+        result.unknown++;
 
         return;
 
       }
 
+
+      // Actual proxy node
 
       if (proxyNames.indexOf(item) !== -1) {
 
@@ -728,6 +723,8 @@ function main(config) {
       }
 
 
+      // Built-in target
+
       if (builtinTargets[item]) {
 
         result.builtin++;
@@ -737,18 +734,18 @@ function main(config) {
       }
 
 
-      var referencedGroup =
-        originalGroups.some(function(g) {
+      // Another proxy group
 
-          return (
+      var referencedGroup = originalGroups.some(function (g) {
 
-            g &&
+        return (
 
-            g.name === item
+          g &&
+          g.name === item
 
-          );
+        );
 
-        });
+      });
 
 
       if (referencedGroup) {
@@ -773,27 +770,23 @@ function main(config) {
   function isAllNodesGroup(group) {
 
     if (!group || !group.name) {
-
       return false;
-
     }
 
+    var name = String(group.name);
 
-    var name =
-      String(group.name);
 
+    // Explicit all-node name
 
     if (isAllNodeName(name)) {
-
       return true;
-
     }
 
 
+    // Business groups are never treated as all-node groups
+
     if (isBusinessGroupName(name)) {
-
       return false;
-
     }
 
 
@@ -802,18 +795,18 @@ function main(config) {
 
 
     if (composition.total === 0) {
-
       return false;
-
     }
 
+
+    // At least two actual nodes
 
     if (composition.actualNodes < 2) {
-
       return false;
-
     }
 
+
+    // Actual nodes must represent a meaningful portion
 
     var ratio =
       composition.actualNodes /
@@ -821,18 +814,16 @@ function main(config) {
 
 
     if (ratio < 0.3) {
-
       return false;
-
     }
 
+
+    // Groups containing other groups
 
     if (composition.groups > 0) {
 
       if (composition.actualNodes >= 5) {
-
         return true;
-
       }
 
       return false;
@@ -848,29 +839,32 @@ function main(config) {
   // ================================================================
   // 16. Preserve airport basic groups
   //
-  // IMPORTANT:
+  // PRESERVE_AIRPORT_GROUPS = false：完全丢弃机场自建分组，输出只包含
+  // 本脚本生成的组。这样分组结构完全可预测，也避免了机场的
+  // 「自动选择」把全部节点再测一遍（移动端健康检查翻倍的主因）。
   //
-  // v1.5.1 fixed the problem where "九云" disappeared.
-  //
-  // Never force hidden=true.
+  // 想保留机场的自动选择 / 故障转移 / 全部节点组时，把开关改成 true。
   // ================================================================
+
+  var PRESERVE_AIRPORT_GROUPS = false;
 
   var preservedGroups = [];
 
 
-  originalGroups.forEach(function(group) {
+  originalGroups.forEach(function (group) {
+
+    if (!PRESERVE_AIRPORT_GROUPS) {
+      return;
+    }
+
 
     if (!group || !group.name) {
-
       return;
-
     }
 
 
     if (managedGroups[group.name]) {
-
       return;
-
     }
 
 
@@ -884,9 +878,7 @@ function main(config) {
 
 
     if (!isBasic) {
-
       return;
-
     }
 
 
@@ -899,6 +891,30 @@ function main(config) {
     delete copied["hidden"];
 
 
+    // 彻底剔除伪节点（剩余流量 / 到期时间 / 官网 …）。
+    //
+    // 它们不是真实代理：留在候选里既可能成为 select 组的默认出口
+    // （select 的默认项就是第一项），也会污染 url-test / fallback 的健康检查。
+    //
+    // 过滤后若组内一个真实节点都不剩，则整组丢弃 ——
+    // 避免生成空候选组导致 mihomo 拒绝整份配置。
+    if (Array.isArray(copied.proxies)) {
+
+      copied.proxies =
+        copied.proxies.filter(function (item) {
+
+          return !junkPattern.test(String(item));
+
+        });
+
+
+      if (copied.proxies.length === 0) {
+        return;
+      }
+
+    }
+
+
     preservedGroups.push(copied);
 
   });
@@ -908,47 +924,38 @@ function main(config) {
   // 17. Convert airport Auto-Select groups to URL-Test
   // ================================================================
 
-  preservedGroups.forEach(function(group) {
+  preservedGroups.forEach(function (group) {
 
     if (!group || !group.name) {
-
       return;
-
     }
 
 
     if (!isAutoSelectGroup(group.name)) {
-
       return;
-
     }
 
 
     group.type = "url-test";
 
-
+    // 只用真实节点：机场本身已经过滤干净时，不能在这里被塞回垃圾节点
     group.proxies =
-      proxyNames.slice();
-
+      validProxyNames.length > 0
+        ? validProxyNames.slice()
+        : proxyNames.slice();
 
     group.url =
       "https://www.gstatic.com/generate_204";
 
-
     group.interval = 300;
-
 
     group.timeout = 5000;
 
-
     group.tolerance = 50;
-
 
     group.lazy = true;
 
-
     group["max-failed-times"] = 3;
-
 
     group["expected-status"] = 204;
 
@@ -961,163 +968,11 @@ function main(config) {
 
 
   // ================================================================
-  // 18. Find airport default manual selector
-  //
-  // Purpose:
-  //
-  //   Network Test
-  //       ↓
-  //   Airport Default Selector
-  //       ↓
-  //   User-selected node
-  //
-  // Example:
-  //
-  //   网络检测
-  //       ↓
-  //      九云
-  //       ↓
-  //      台湾节点
-  //
-  // Do NOT hardcode "九云".
-  // ================================================================
-
-  function findDefaultAirportGroup() {
-
-    var candidates = [];
-
-
-    originalGroups.forEach(function(group) {
-
-      if (!group || !group.name) {
-
-        return;
-
-      }
-
-
-      var name =
-        String(group.name);
-
-
-      // Ignore groups managed by Perfect-Rules.
-
-      if (managedGroups[name]) {
-
-        return;
-
-      }
-
-
-      // Ignore automatic groups.
-
-      if (isAutoSelectGroup(name)) {
-
-        return;
-
-      }
-
-
-      // Ignore failover groups.
-
-      if (isFailoverGroup(name)) {
-
-        return;
-
-      }
-
-
-      // Ignore obvious business groups.
-
-      if (isBusinessGroupName(name)) {
-
-        return;
-
-      }
-
-
-      if (group.type !== "select") {
-
-        return;
-
-      }
-
-
-      var composition =
-        getProxyComposition(group);
-
-
-      if (composition.actualNodes < 2) {
-
-        return;
-
-      }
-
-
-      candidates.push({
-
-        group: group,
-
-        score: 0,
-
-        index: candidates.length
-
-      });
-
-    });
-
-
-    // --------------------------------------------------------------
-    // Prefer an all-node manual selector.
-    //
-    // This matches common airport structures such as:
-    //
-    //   九云
-    //   节点
-    //   全部节点
-    //
-    // where the group directly contains many actual proxy nodes.
-    // --------------------------------------------------------------
-
-    for (var i = 0; i < candidates.length; i++) {
-
-      if (isAllNodesGroup(candidates[i].group)) {
-
-        return candidates[i].group.name;
-
-      }
-
-    }
-
-
-    // --------------------------------------------------------------
-    // Fallback:
-    //
-    // Use the first suitable manual select group.
-    // --------------------------------------------------------------
-
-    if (candidates.length > 0) {
-
-      return candidates[0].group.name;
-
-    }
-
-
-    return null;
-
-  }
-
-
-  var defaultAirportGroup =
-    findDefaultAirportGroup();
-
-
-  // ================================================================
   // 19. Remote Rule Provider base URL
   // ================================================================
 
   var ruleBaseURL =
-    "https://cdn.jsdelivr.net/gh/n0de-sudo/Perfect-Rules@main/Clash/rules/";
+    "https://cdn.jsdelivr.net/gh/Naisisor/Perfect-Rules@main/Clash/rules/";
 
 
   // ================================================================
@@ -1147,11 +1002,6 @@ function main(config) {
 
   // ================================================================
   // 21. Remote Rule Providers
-  //
-  // GitHub repository:
-  //
-  // n0de-sudo/Perfect-Rules
-  //
   // ================================================================
 
   config["rule-providers"] = {
@@ -1189,8 +1039,11 @@ function main(config) {
     "Microsoft":
       createRuleProvider("microsoft.yaml"),
 
-    "NetworkTest":
-      createRuleProvider("network-test.yaml")
+    "Ads":
+      createRuleProvider("ads.yaml"),
+
+    "Twitter":
+      createRuleProvider("twitter.yaml")
 
   };
 
@@ -1203,14 +1056,10 @@ function main(config) {
 
     "香港": [
 
+      /🇭🇰/,
       /香港/i,
-
-      /\bHK\b/i,
-
-      /HKG/i,
-
+      /HK/i,
       /Hong\s*Kong/i,
-
       /HongKong/i
 
     ],
@@ -1218,20 +1067,15 @@ function main(config) {
 
     "台湾": [
 
+      /🇹🇼/,
       /台湾/i,
-
       /台灣/i,
-
       /\bTW\b/i,
-
+      /(^|[^A-Za-z])TW[-_\s]?\d/i,
       /TPE/i,
-
       /KHH/i,
-
       /TSA/i,
-
       /Taiwan/i,
-
       /Taipei/i
 
     ],
@@ -1239,24 +1083,14 @@ function main(config) {
 
     "日本": [
 
+      /🇯🇵/,
       /日本/i,
-
       /\bJP\b/i,
-
-      /NRT/i,
-
-      /HND/i,
-
-      /KIX/i,
-
-      /CTS/i,
-
-      /FUK/i,
-
+      /(^|[^A-Za-z])JP[-_\s]?\d/i,
+      /JPN/i,
+      /NRT|HND|KIX|CTS|FUK|OKA|NGO/i,
       /Japan/i,
-
       /Tokyo/i,
-
       /Osaka/i
 
     ],
@@ -1264,14 +1098,13 @@ function main(config) {
 
     "新加坡": [
 
+      /🇸🇬/,
       /新加坡/i,
-
       /\bSG\b/i,
-
+      /(^|[^A-Za-z])SG[-_\s]?\d/i,
+      /SGP/i,
       /SIN/i,
-
       /XSP/i,
-
       /Singapore/i
 
     ],
@@ -1279,117 +1112,217 @@ function main(config) {
 
     "韩国": [
 
+      /🇰🇷/,
       /韩国/i,
-
       /韓國/i,
-
       /\bKR\b/i,
-
-      /ICN/i,
-
-      /GMP/i,
-
-      /PUS/i,
-
+      /(^|[^A-Za-z])KR[-_\s]?\d/i,
+      /ICN|GMP|PUS/i,
       /Korea/i,
-
       /Seoul/i
 
     ],
 
 
+    // 美国节点命名最混乱，这里覆盖：
+    //   旗帜 emoji（🇺🇸 01）
+    //   国家名（美国 / 美西 / 美东 / 美区 / 美利坚 / United States / America）
+    //   无分隔符编号（US01 / US-01 / US_01 / USA01 / 美01）
+    //   主要机场三字码与城市名（英文 + 中文）
+    //
+    // 注意：三字码用 (^|[^A-Za-z]) ... (?![A-Za-z]) 卡住词边界，
+    // 否则 AUS 会命中 Australia、DEN 会命中 Denmark。
     "美国": [
 
+      /🇺🇸/,
       /美国/i,
-
+      /美西/i,
+      /美东/i,
+      /美区/i,
+      /美利坚/i,
+      /美[-_\s]?\d/i,
       /\bUS\b/i,
-
-      /\bUSA\b/i,
-
-      /LAX/i,
-
-      /SFO/i,
-
-      /JFK/i,
-
-      /SJC/i,
-
+      /(^|[^A-Za-z])USA/i,
+      /(^|[^A-Za-z])US[-_\s]?\d/i,
+      /(^|[^A-Za-z])US[-_\s]/i,
       /United\s*States/i,
-
-      /America/i,
-
-      /Los\s*Angeles/i,
-
-      /San\s*Jose/i,
-
-      /New\s*York/i
+      /\bAmerica\b/i,
+      /Los\s*Angeles|San\s*Jose|San\s*Francisco|San\s*Diego|Salt\s*Lake|New\s*York/i,
+      /Silicon\s*Valley|Las\s*Vegas|St\.?\s*Louis|Silicon\s*Valley/i,
+      /Seattle|Miami|Dallas|Ashburn|Chicago|Phoenix|Atlanta|Boston|Denver|Portland/i,
+      /Houston|Austin|Minneapolis|Detroit|Philadelphia|Washington|Honolulu|Anchorage/i,
+      /Charlotte|Nashville|Columbus|Cleveland|Orlando|Tampa|Oakland/i,
+      /(^|[^A-Za-z])(LAX|SFO|JFK|SJC|SEA|ORD|DFW|MIA|IAD|ATL|PHX|EWR|BOS|DEN|LAS|MSP|DTW|CLT|PHL|IAH|SAN|PDX|AUS|SLC|MCO|HNL|STL|RDU|BNA|MCI|SAT|OAK|BUR|SNA|SMF|SJU|PIT|BWI|DCA|MDW|TPA|CLE|CVG|IND|CMH|MKE|JAX|PBI|ONT|ANC)(?![A-Za-z])/i,
+      /洛杉矶|圣何塞|圣荷西|硅谷|西雅图|达拉斯|迈阿密|芝加哥|凤凰城|阿什本|纽约/i,
+      /亚特兰大|波士顿|丹佛|拉斯维加斯|波特兰|休斯顿|奥斯汀|费城|华盛顿/i,
+      /圣地亚哥|圣迭戈|檀香山|盐湖城|底特律|明尼阿波利斯|夏洛特|纳什维尔/i,
+      /圣路易斯|哥伦布|安克雷奇|奥兰多|坦帕|克利夫兰|奥克兰/i
 
     ],
 
 
     "加拿大": [
 
+      /🇨🇦/,
       /加拿大/i,
-
       /Canada/i,
-
       /Toronto/i,
-
       /Vancouver/i,
-
       /Montreal/i
 
     ],
 
 
+    // 原来用裸 /UK/i 做子串匹配，会把 Ukraine、含 "uk" 的任意名字
+    // 误判成英国，这里改为词边界。
     "英国": [
 
+      /🇬🇧/,
       /英国/i,
-
-      /UK/i,
-
+      /\bUK\b/i,
+      /\bGB\b/i,
       /United\s*Kingdom/i,
-
       /England/i,
-
       /London/i,
-
       /Manchester/i
+
+    ],
+
+
+    // 德国。注意只能用 /\bDE\b/，裸 /DE/i 会把 Sweden 也判成德国。
+    "德国": [
+
+      /🇩🇪/,
+      /德国/i,
+      /德國/i,
+      /\bDE\b/i,
+      /(^|[^A-Za-z])DE[-_\s]?\d/i,
+      /Germany/i,
+      /Frankfurt/i,
+      /Falkenstein/i,
+      /Nuremberg|Nürnberg/i,
+      /Berlin/i,
+      /Munich|München/i,
+      /Dusseldorf|Düsseldorf/i,
+      /Hamburg/i,
+      /Stuttgart/i,
+      /Cologne|Köln/i,
+      /法兰克福|法兰/i,
+      /柏林/i,
+      /慕尼黑/i
+
+    ],
+
+
+    // 荷兰。常见机房：阿姆斯特丹 AMS / Hetzner。
+    "荷兰": [
+
+      /🇳🇱/,
+      /荷兰/i,
+      /荷蘭/i,
+      /\bNL\b/i,
+      /(^|[^A-Za-z])NL[-_\s]?\d/i,
+      /Netherlands|Holland/i,
+      /Amsterdam/i,
+      /阿姆斯特丹/i
+
+    ],
+
+
+    // 爱沙尼亚。常见机房：塔林 TLL / Hetzner。
+    "爱沙尼亚": [
+
+      /🇪🇪/,
+      /爱沙尼亚/i,
+      /愛沙尼亞/i,
+      /\bEE\b/i,
+      /(^|[^A-Za-z])EE[-_\s]?\d/i,
+      /Estonia/i,
+      /Tallinn/i,
+      /塔林/i
 
     ]
 
   };
 
 
+  // 按「名字中最先出现的地区标记」判定归属。
+  //
+  // 原实现是「按对象键顺序首次命中即返回」，而香港排在第一个键，
+  // 于是 `美国-HK-IEPL-01`、`US-HK-03`、`HK-US-01` 这类双标记节点
+  // 一律被判给香港，美国组因此经常缺节点甚至整组消失。
   function detectRegion(proxyName) {
+
+    var text = String(proxyName);
+
+    var bestRegion = "其他地区";
+    var bestIndex = Infinity;
+    var bestScore = 0;
+
 
     for (var region in regionPatterns) {
 
-      if (!regionPatterns.hasOwnProperty(region)) {
-
+      if (
+        !Object.prototype.hasOwnProperty.call(
+          regionPatterns,
+          region
+        )
+      ) {
         continue;
-
       }
 
 
       var patterns =
         regionPatterns[region];
 
+      var firstIndex = Infinity;
+      var score = 0;
+
 
       for (var i = 0; i < patterns.length; i++) {
 
-        if (patterns[i].test(proxyName)) {
+        var matched =
+          patterns[i].exec(text);
 
-          return region;
-
+        if (!matched) {
+          continue;
         }
+
+        score++;
+
+        if (matched.index < firstIndex) {
+          firstIndex = matched.index;
+        }
+
+      }
+
+
+      if (score === 0) {
+        continue;
+      }
+
+
+      // 先比位置：名字里出现得更早的地区优先；
+      // 位置相同时再比命中数量。
+      if (
+        firstIndex < bestIndex ||
+
+        (
+          firstIndex === bestIndex &&
+          score > bestScore
+        )
+      ) {
+
+        bestIndex = firstIndex;
+        bestScore = score;
+        bestRegion = region;
 
       }
 
     }
 
 
-    return "其他地区";
+    return bestRegion;
 
   }
 
@@ -1416,31 +1349,67 @@ function main(config) {
 
     "英国": [],
 
+    "德国": [],
+
+    "荷兰": [],
+
+    "爱沙尼亚": [],
+
     "其他地区": []
 
   };
 
 
-  originalProxies.forEach(function(proxy) {
+  originalProxies.forEach(function (proxy) {
 
     if (!proxy || !proxy.name) {
-
       return;
+    }
 
+
+    var name =
+      String(proxy.name);
+
+
+    // 跳过机场下发的信息类伪节点。
+    // 少了这一步，它们会因为没有地区特征而全部堆进「其他地区」，
+    // 把那一组变成纯死节点，而它正是 fallback 链的倒数第二环。
+    if (junkPattern.test(name)) {
+      return;
     }
 
 
     var region =
-      detectRegion(String(proxy.name));
+      detectRegion(name);
 
 
     regionNodes[region].push(
-
-      proxy.name
-
+      name
     );
 
   });
+
+
+  // ================================================================
+  // 23.1 Drop airport region-named groups
+  //
+  // 方案 B：丢弃机场自建的地区命名组（「🇭🇰 香港节点」「日本节点」
+  // 「美国专线」…）。脚本已经按地区生成了标准组，这类组只是重复，
+  // 而且成员往往不如脚本过滤得干净。
+  //
+  // 判定用的是「组名」而非成员 —— 「九云」「自动选择」「故障转移」
+  // 「全部节点」这类非地区命名会原样保留。
+  //
+  // 必须放在这里：detectRegion 依赖 regionPatterns，而 regionPatterns
+  // 是 const，早于本节调用会触发 TDZ。
+  // ================================================================
+
+  var finalPreservedGroups =
+    preservedGroups.filter(function (group) {
+
+      return detectRegion(String(group.name)) === "其他地区";
+
+    });
 
 
   // ================================================================
@@ -1465,6 +1434,12 @@ function main(config) {
 
     "英国",
 
+    "德国",
+
+    "荷兰",
+
+    "爱沙尼亚",
+
     "其他地区"
 
   ];
@@ -1477,22 +1452,17 @@ function main(config) {
   var regionGroups = [];
 
 
-  regionOrder.forEach(function(region) {
+  regionOrder.forEach(function (region) {
 
     var nodes =
       regionNodes[region];
 
 
     if (
-
       !nodes ||
-
       nodes.length === 0
-
     ) {
-
       return;
-
     }
 
 
@@ -1507,7 +1477,10 @@ function main(config) {
       "url":
         "https://www.gstatic.com/generate_204",
 
-      "interval": 300,
+      // 600s：地区组多、成员多时，300s 会让健康检查非常密集
+      // （实测 600+ 节点时约 4.5 次/秒、每天 38 万次请求）。
+      // 配合 lazy:true，空载时还会进一步降频。
+      "interval": 600,
 
       "timeout": 5000,
 
@@ -1522,14 +1495,13 @@ function main(config) {
     };
 
 
+    // 第二个参数 true = 未单独配置图标的地区使用默认图标兜底
     var icon =
-      getGroupIcon(region);
+      getGroupIcon(region, true);
 
 
     if (icon) {
-
       group["icon"] = icon;
-
     }
 
 
@@ -1539,11 +1511,181 @@ function main(config) {
 
 
   var availableRegions =
-    regionGroups.map(function(group) {
+    regionGroups.map(function (group) {
 
       return group.name;
 
     });
+
+
+  // ================================================================
+  // 25.1 Auto-selection chains
+  //
+  // 自动链：作为各业务组的第一个候选 / 默认选项。两套语义：
+  //
+  //   url-test  —— 按延迟择优，跨地区也挑最快的。用于「自动-最快」：
+  //                期望是「哪个延时低用哪个」，所以不锁地区。
+  //   fallback  —— 按顺序取第一个可用地区，不比较延迟。用于
+  //                「自动-美国优先」：AI 需要稳定出口，宁可慢也不跳 IP。
+  //
+  // 地区内部仍然是 url-test，按延迟挑该地区最快的节点。
+  //
+  // 必须在这里创建：后面的「默认代理」与业务组都会引用它，晚于它们会触发
+  // const 的 TDZ。
+  // ================================================================
+
+  function createAutoChain(name, preferredRegions, groupType, excludeHongKong, tolerance) {
+
+    var preferred = preferredRegions.filter(function (region) {
+
+      return availableRegions.indexOf(region) !== -1;
+
+    });
+
+
+    var rest = availableRegions.filter(function (region) {
+
+      return (
+        preferred.indexOf(region) === -1 &&
+        !(excludeHongKong && region === "香港")
+      );
+
+    });
+
+
+    var proxies =
+      preferred.concat(rest);
+
+
+    // 极端情况兜底：没有任何地区组时指向 DIRECT，避免空组
+    if (proxies.length === 0) {
+      proxies.push("DIRECT");
+    }
+
+
+    var group = {
+
+      "name": name,
+
+      "type": groupType,
+
+      "proxies": proxies,
+
+      "url":
+        "https://www.gstatic.com/generate_204",
+
+      "interval": 600,
+
+      "timeout": 5000,
+
+      "lazy": true,
+
+      "max-failed-times": 3,
+
+      "expected-status": 204
+
+    };
+
+
+    // url-test 的切换容差（ms）：新地区要比当前快这么多才切换，
+    // 避免延迟小波动就来回换地区、导致出口 IP 漂移。
+    if (groupType === "url-test" && tolerance) {
+      group["tolerance"] = tolerance;
+    }
+
+
+    var icon =
+      getGroupIcon(name);
+
+
+    if (icon) {
+      group["icon"] = icon;
+    }
+
+
+    return group;
+
+  }
+
+
+  // 只有存在地区组时才创建降级链；否则业务组不注入（避免循环引用）
+  var autoGroups = [];
+
+  if (availableRegions.length > 0) {
+
+    // 最快优先：按延迟择优，不锁地区（url-test）
+    //
+    // 成员顺序按「预期延迟从低到高」排列（中国大陆出发的经验值）：
+    //   香港 10-40ms / 台湾 30-60 / 日本 40-80 / 韩国 50-90 /
+    //   新加坡 60-110 / 美国 130-220 / 加拿大 160-240 /
+    //   英国 200-260 / 德国 230-290 / 荷兰 240-300 / 爱沙尼亚 250-310
+    //
+    // url-test 本身不看顺序，这里只是让界面顺序与实际最可能被选中的
+    // 地区一致，并让首次测速完成前先落到香港（通常延迟最低）。
+    // 「其他地区」不在列表里，会自动追加到末尾。
+    autoGroups.push(createAutoChain(
+      "自动-最快",
+      [
+        "香港",
+        "台湾",
+        "日本",
+        "韩国",
+        "新加坡",
+        "美国",
+        "加拿大",
+        "英国",
+        "德国",
+        "荷兰",
+        "爱沙尼亚"
+      ],
+      "url-test",
+      false,
+      200
+    ));
+
+
+    // 美国优先：给 AI 用（不含香港 —— OpenAI 不支持，fallback 保稳定出口）
+    autoGroups.push(createAutoChain(
+      "自动-美国优先",
+      [
+        "美国",
+        "日本",
+        "新加坡",
+        "台湾",
+        "韩国",
+        "加拿大",
+        "英国",
+        "德国",
+        "荷兰",
+        "爱沙尼亚"
+      ],
+      "fallback",
+      true
+    ));
+
+
+    // 香港优先：fallback 保稳定出口，供用户在各业务组里手动选择。
+    // 不设为默认 —— 默认仍是「自动-最快」。
+    autoGroups.push(createAutoChain(
+      "自动-香港优先",
+      [
+        "香港",
+        "台湾",
+        "日本",
+        "韩国",
+        "新加坡",
+        "美国",
+        "加拿大",
+        "英国",
+        "德国",
+        "荷兰",
+        "爱沙尼亚"
+      ],
+      "fallback",
+      false
+    ));
+
+  }
 
 
   // ================================================================
@@ -1557,9 +1699,7 @@ function main(config) {
     "type": "select",
 
     "proxies": [
-
       "DIRECT"
-
     ]
 
   };
@@ -1581,24 +1721,32 @@ function main(config) {
   // 27. One-click Proxy
   // ================================================================
 
+  // 首项放自动链 —— select 的默认项就是第一项。
+  // 「自动-最快」为默认，「自动-香港优先」作为备用自动模式供手动选择。
+  var mainCandidates =
+    (autoGroups.length > 0
+      ? ["自动-最快", "自动-香港优先"]
+      : []).concat(
+      availableRegions,
+      [
+        "国内直连"
+      ]
+    );
+
+
   var mainSelector = {
 
-    "name": "一键代理",
+    "name": "默认代理",
 
     "type": "select",
 
-    "proxies":
-      availableRegions.concat([
-
-        "国内直连"
-
-      ])
+    "proxies": mainCandidates
 
   };
 
 
   var mainIcon =
-    getGroupIcon("一键代理");
+    getGroupIcon("默认代理");
 
 
   if (mainIcon) {
@@ -1613,7 +1761,20 @@ function main(config) {
   // 28. Service groups
   // ================================================================
 
-  function createBusinessGroup(name) {
+  // autoChains：自动链数组，按顺序插在候选最前面。
+  // 第一项即 select 组的默认项，其余作为可选的自动模式。
+  function createBusinessGroup(name, autoChains) {
+
+    var candidates =
+      (autoChains && autoGroups.length > 0
+        ? autoChains
+        : []).concat(
+        availableRegions,
+        [
+          "国内直连"
+        ]
+      );
+
 
     var group = {
 
@@ -1621,12 +1782,7 @@ function main(config) {
 
       "type": "select",
 
-      "proxies":
-        availableRegions.concat([
-
-          "国内直连"
-
-        ])
+      "proxies": candidates
 
     };
 
@@ -1636,9 +1792,7 @@ function main(config) {
 
 
     if (icon) {
-
       group["icon"] = icon;
-
     }
 
 
@@ -1647,135 +1801,166 @@ function main(config) {
   }
 
 
+  // AI 组单独构造：美国优先 + 手动选择（select）。
+  //
+  // 用 select 而不是 fallback —— 美国节点故障时不自动转移。自动降级会
+  // 悄悄更换出口 IP，OpenAI 的风控会看到 IP 跳变，反而更容易触发验证。
+  //
+  // 候选：美国 > 日本 > 新加坡 > 台湾 > 韩国 > 其余地区。
+  // 不含香港（OpenAI 不支持，而香港节点做连通性检查会通过，属
+  // 「健康但不可用」），也不含「国内直连」。
+  function createAIGroup() {
+
+    var preferred = [
+      "美国",
+      "日本",
+      "新加坡",
+      "台湾",
+      "韩国"
+    ].filter(function (region) {
+
+      return availableRegions.indexOf(region) !== -1;
+
+    });
+
+
+    var backup = availableRegions.filter(function (region) {
+
+      return (
+        preferred.indexOf(region) === -1 &&
+        region !== "香港"
+      );
+
+    });
+
+
+    var proxies =
+      preferred.concat(backup);
+
+
+    // 极端情况兜底，避免生成空候选组（mihomo 会因此拒绝整份配置）
+    if (proxies.length === 0) {
+      proxies.push("默认代理");
+    }
+
+
+    // 默认项必须是「美国」这个地区组本身，而不是降级链。
+    // 降级链放在第 2 位：需要自动降级时手动切过去即可。
+    // 这样 AI 的出口稳定在美国，不会因美国节点波动而悄悄换到日本，
+    // 避免 OpenAI 风控看到 IP 跳变。
+    if (autoGroups.length > 0) {
+      proxies.splice(1, 0, "自动-美国优先");
+    }
+
+
+    var group = {
+
+      "name": "AI",
+
+      "type": "select",
+
+      "proxies": proxies
+
+    };
+
+
+    var icon =
+      getGroupIcon("AI");
+
+
+    if (icon) {
+      group["icon"] = icon;
+    }
+
+
+    return group;
+
+  }
+
+
+  // 业务组：首项均为自动降级链，往下是手动可选的地区
+  var defaultChains = ["自动-最快", "自动-香港优先"];
+
   var businessGroups = [
 
-    createBusinessGroup("AI"),
+    // AI 服务：美国优先链 + 手动选择（OpenAI 不支持香港）
+    createAIGroup(),
 
-    createBusinessGroup("YouTube"),
+    createBusinessGroup("YouTube", defaultChains),
 
-    createBusinessGroup("Google"),
+    createBusinessGroup("Google", defaultChains),
 
-    createBusinessGroup("GitHub"),
+    createBusinessGroup("GitHub", defaultChains),
 
-    createBusinessGroup("Netflix"),
+    createBusinessGroup("Netflix", defaultChains),
 
-    createBusinessGroup("Spotify"),
+    createBusinessGroup("Spotify", defaultChains),
 
-    createBusinessGroup("Steam"),
+    createBusinessGroup("Steam", defaultChains),
 
-    createBusinessGroup("Telegram"),
+    createBusinessGroup("Telegram", defaultChains),
 
-    createBusinessGroup("TikTok"),
+    createBusinessGroup("TikTok", defaultChains),
 
-    createBusinessGroup("Apple"),
+    createBusinessGroup("X", defaultChains),
 
-    createBusinessGroup("Microsoft")
+    createBusinessGroup("Apple", defaultChains),
+
+    createBusinessGroup("Microsoft", defaultChains)
 
   ];
 
 
-  // ================================================================
-  // 29. Network Test
-  //
-  // IMPORTANT:
-  //
-  // Network Test follows the airport's default manual selector.
-  //
-  // Example:
-  //
-  //   九云
-  //      ↓
-  //   台湾节点
-  //
-  // Network Test:
-  //
-  //   网络检测
-  //      ↓
-  //     九云
-  //      ↓
-  //   台湾节点
-  //
-  // Therefore the network diagnostic websites will test the same
-  // outbound proxy selected by the user in the airport's default
-  // manual selector.
-  //
-  // ================================================================
+  // 广告拦截：默认 REJECT，可在界面上切换为 DIRECT。
+  // 规则表里排在很靠前的位置，拦截优先于其他所有分流。
+  var adBlockGroup = {
 
-  var networkTestGroup = {
-
-    "name": "网络检测",
+    "name": "广告拦截",
 
     "type": "select",
 
-    "proxies": []
+    "proxies": [
+      "REJECT",
+      "DIRECT"
+    ]
 
   };
 
 
-  if (defaultAirportGroup) {
-
-    networkTestGroup["proxies"] = [
-
-      defaultAirportGroup
-
-    ];
-
-  } else {
-
-    // Fallback:
-    //
-    // If no suitable airport manual selector can be detected,
-    // follow the Perfect-Rules main selector instead.
-
-    networkTestGroup["proxies"] = [
-
-      "一键代理"
-
-    ];
-
-  }
+  var adBlockIcon =
+    getGroupIcon("广告拦截");
 
 
-  var networkTestIcon =
-    getGroupIcon("网络检测");
-
-
-  if (networkTestIcon) {
-
-    networkTestGroup["icon"] =
-      networkTestIcon;
-
+  if (adBlockIcon) {
+    adBlockGroup["icon"] = adBlockIcon;
   }
 
 
   // ================================================================
-  // 30. Final proxy-group list
+  // 29. Final proxy-group architecture
   //
-  // IMPORTANT:
-  //
-  // Airport groups are preserved.
-  //
-  // Example:
-  //
-  //   九云
-  //
-  // remains visible.
-  //
-  // Network Test follows the airport default selector.
+  //   Airport basic groups
+  //          ↓
+  //   Perfect-Rules service groups
+  //          ↓
+  //   Network Test
+  //          ↓
+  //   Perfect-Rules region groups
+  //          ↓
+  //   Domestic Direct
+  //          ↓
+  //   One-click Proxy
   //
   // ================================================================
 
   config["proxy-groups"] =
 
-    preservedGroups
+    // 默认代理放第一位：它是所有未指定流量的出口，最常需要查看 / 切换
+    [mainSelector]
+
+      .concat(finalPreservedGroups)
 
       .concat(businessGroups)
-
-      .concat([
-
-        networkTestGroup
-
-      ])
 
       .concat(regionGroups)
 
@@ -1783,19 +1968,20 @@ function main(config) {
 
         domesticDirectGroup,
 
-        mainSelector
+        adBlockGroup
 
-      ]);
+      ])
+
+      // 自动降级链放最末尾：它们是各业务组内部的默认选项，
+      // 正常情况下不需要直接操作
+      .concat(autoGroups);
 
 
   // ================================================================
-  // 31. Routing rules
+  // 30. Routing rules
   //
-  // IMPORTANT:
+  // Rule Provider order:
   //
-  // Rule Providers are deliberately ordered:
-  //
-  // NetworkTest
   // AI
   // YouTube
   // Google
@@ -1807,7 +1993,8 @@ function main(config) {
   // TikTok
   // Apple
   // Microsoft
-  // CN / Private
+  // Private
+  // China
   // MATCH
   //
   // YouTube MUST be before Google.
@@ -1836,23 +2023,98 @@ function main(config) {
 
 
     // --------------------------------------------------------------
-    // Network Test
+    // Ads
     // --------------------------------------------------------------
 
-    "RULE-SET,NetworkTest,网络检测",
+    "RULE-SET,Ads,广告拦截",
 
 
     // --------------------------------------------------------------
     // AI
+    //
+    // 显式域名兜底：不依赖 geosite 数据与远程 rule-provider，
+    // 任一环节加载失败时也不会漏到 MATCH 走「默认代理」。
     // --------------------------------------------------------------
+
+    "DOMAIN-SUFFIX,openai.com,AI",
+
+    "DOMAIN-SUFFIX,chatgpt.com,AI",
+
+    "DOMAIN-SUFFIX,chat.com,AI",
+
+    "DOMAIN-SUFFIX,oaistatic.com,AI",
+
+    "DOMAIN-SUFFIX,oaiusercontent.com,AI",
+
+    "DOMAIN-SUFFIX,sora.com,AI",
+
+    "DOMAIN-SUFFIX,anthropic.com,AI",
+
+    "DOMAIN-SUFFIX,claude.ai,AI",
+
+    "DOMAIN-SUFFIX,muse.ai,AI",
+
+    // Gemini / Google DeepMind
+    //
+    // Gemini 挂在 google.com / googleapis.com 之下，若不在这里显式拦截，
+    // 规则集或 geosite 故障时会被后面的 GEOSITE,google 抢去「Google」组。
+    // 以下域名取自官方 geosite 的 google-deepmind 列表。
+    //
+    // 只保留「日常使用 Gemini / AI Studio / Generative Language API」
+    // 必需的域名。google-deepmind 里的长尾附加产品已精简掉：
+    //   Gemini Code Assist、NotebookLM、Jules、Labs、Flow、Opal、
+    //   Antigravity、Stitch
+    // 正常场景下这些仍由 GEOSITE,category-ai-!cn 兜住，
+    // 仅规则集/geosite 故障时不再计入。需要时按名字从上游列表加回即可。
+
+    // DeepMind
+    "DOMAIN-SUFFIX,deepmind.com,AI",
+
+    "DOMAIN-SUFFIX,deepmind.google,AI",
+
+    // Generative Language API
+    "DOMAIN-SUFFIX,geller-pa.googleapis.com,AI",
+
+    "DOMAIN-SUFFIX,generativelanguage.googleapis.com,AI",
+
+    "DOMAIN-SUFFIX,proactivebackend-pa.googleapis.com,AI",
+
+    "DOMAIN-SUFFIX,robinfrontend-pa.googleapis.com,AI",
+
+    // Gemini 网页版 / AI Studio
+    "DOMAIN-SUFFIX,gemini.google,AI",
+
+    "DOMAIN-SUFFIX,gemini.google.com,AI",
+
+    "DOMAIN-SUFFIX,gemini.gstatic.com,AI",
+
+    "DOMAIN-SUFFIX,geminiweb-pa.clients.google.com,AI",
+
+    "DOMAIN-SUFFIX,geminiweb-pa.clients6.google.com,AI",
+
+    "DOMAIN-SUFFIX,bard.google.com,AI",
+
+    "DOMAIN-SUFFIX,ai.studio,AI",
+
+    "DOMAIN-SUFFIX,aistudio.google.com,AI",
+
+    "DOMAIN-SUFFIX,ai.google.dev,AI",
+
+    "DOMAIN-SUFFIX,generativeai.google,AI",
+
+    "DOMAIN-SUFFIX,makersuite.google.com,AI",
+
+    "DOMAIN-SUFFIX,alkalicore-pa.clients6.google.com,AI",
+
+    "DOMAIN-SUFFIX,alkalimakersuite-pa.clients6.google.com,AI",
+
+    "DOMAIN-SUFFIX,webchannel-alkalimakersuite-pa.clients6.google.com,AI",
 
     "RULE-SET,AI,AI",
 
 
     // --------------------------------------------------------------
     // YouTube
-    //
-    // MUST be before Google.
     // --------------------------------------------------------------
 
     "RULE-SET,YouTube,YouTube",
@@ -1908,6 +2170,13 @@ function main(config) {
 
 
     // --------------------------------------------------------------
+    // X（原 Twitter）
+    // --------------------------------------------------------------
+
+    "RULE-SET,Twitter,X",
+
+
+    // --------------------------------------------------------------
     // Apple
     // --------------------------------------------------------------
 
@@ -1943,13 +2212,13 @@ function main(config) {
     // Final
     // --------------------------------------------------------------
 
-    "MATCH,一键代理"
+    "MATCH,默认代理"
 
   ];
 
 
   // ================================================================
-  // 32. Return generated config
+  // 31. Return generated config
   // ================================================================
 
   return config;
