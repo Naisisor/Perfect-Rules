@@ -357,7 +357,7 @@ const main = (config) => {
 
     "默认代理": "Proxy.png",
 
-    "自动-日本优先": "Proxy.png",
+    "自动-最快": "Proxy.png",
 
     "自动-美国优先": "Proxy.png",
 
@@ -445,7 +445,7 @@ const main = (config) => {
 
     "默认代理": true,
 
-    "自动-日本优先": true,
+    "自动-最快": true,
 
     "自动-美国优先": true,
 
@@ -1515,19 +1515,22 @@ const main = (config) => {
 
 
   // ================================================================
-  // 25.1 Auto-failover chains
+  // 25.1 Auto-selection chains
   //
-  // 自动降级链（fallback）：作为各业务组的第一个候选 / 默认选项。
+  // 自动链：作为各业务组的第一个候选 / 默认选项。两套语义：
   //
-  // 这一层是「故障转移」，不是「测速择优」—— 按顺序取第一个可用的地区组，
-  // 不比较延迟，所以只要前一个地区还有健康节点就不会换地区，跨地区出口
-  // 稳定；地区内部才是 url-test 按延迟择优。
+  //   url-test  —— 按延迟择优，跨地区也挑最快的。用于「自动-最快」：
+  //                期望是「哪个延时低用哪个」，所以不锁地区。
+  //   fallback  —— 按顺序取第一个可用地区，不比较延迟。用于
+  //                「自动-美国优先」：AI 需要稳定出口，宁可慢也不跳 IP。
+  //
+  // 地区内部仍然是 url-test，按延迟挑该地区最快的节点。
   //
   // 必须在这里创建：后面的「默认代理」与业务组都会引用它，晚于它们会触发
   // const 的 TDZ。
   // ================================================================
 
-  function createAutoFailoverGroup(name, preferredRegions, excludeHongKong) {
+  function createAutoChain(name, preferredRegions, groupType, excludeHongKong, tolerance) {
 
     const preferred = preferredRegions.filter((region) => {
 
@@ -1560,7 +1563,7 @@ const main = (config) => {
 
       "name": name,
 
-      "type": "fallback",
+      "type": groupType,
 
       "proxies": proxies,
 
@@ -1578,6 +1581,13 @@ const main = (config) => {
       "expected-status": 204
 
     };
+
+
+    // url-test 的切换容差（ms）：新地区要比当前快这么多才切换，
+    // 避免延迟小波动就来回换地区、导致出口 IP 漂移。
+    if (groupType === "url-test" && tolerance) {
+      group["tolerance"] = tolerance;
+    }
 
 
     const icon =
@@ -1599,9 +1609,9 @@ const main = (config) => {
 
   if (availableRegions.length > 0) {
 
-    // 日本优先：给无地区锁的服务用
-    autoGroups.push(createAutoFailoverGroup(
-      "自动-日本优先",
+    // 最快优先：按延迟择优，不锁地区（url-test）
+    autoGroups.push(createAutoChain(
+      "自动-最快",
       [
         "日本",
         "香港",
@@ -1614,12 +1624,15 @@ const main = (config) => {
         "德国",
         "荷兰",
         "爱沙尼亚"
-      ]
+      ],
+      "url-test",
+      false,
+      200
     ));
 
 
-    // 美国优先：给 AI 用（不含香港 —— OpenAI 不支持）
-    autoGroups.push(createAutoFailoverGroup(
+    // 美国优先：给 AI 用（不含香港 —— OpenAI 不支持，fallback 保稳定出口）
+    autoGroups.push(createAutoChain(
       "自动-美国优先",
       [
         "美国",
@@ -1633,6 +1646,7 @@ const main = (config) => {
         "荷兰",
         "爱沙尼亚"
       ],
+      "fallback",
       true
     ));
 
@@ -1680,7 +1694,7 @@ const main = (config) => {
 
   // 首项放自动降级链 —— select 的默认项就是第一项
   if (autoGroups.length > 0) {
-    mainCandidates.unshift("自动-日本优先");
+    mainCandidates.unshift("自动-最快");
   }
 
 
@@ -1828,7 +1842,7 @@ const main = (config) => {
 
 
   // 业务组：首项均为自动降级链，往下是手动可选的地区
-  const defaultChain = "自动-日本优先";
+  const defaultChain = "自动-最快";
 
   const businessGroups = [
 
