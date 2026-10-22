@@ -359,6 +359,8 @@ const main = (config) => {
 
     "自动-最快": "Proxy.png",
 
+    "自动-香港优先": "Proxy.png",
+
     "自动-美国优先": "Proxy.png",
 
     "国内直连": "China.png",
@@ -446,6 +448,8 @@ const main = (config) => {
     "默认代理": true,
 
     "自动-最快": true,
+
+    "自动-香港优先": true,
 
     "自动-美国优先": true,
 
@@ -1659,6 +1663,28 @@ const main = (config) => {
       true
     ));
 
+
+    // 香港优先：fallback 保稳定出口，供用户在各业务组里手动选择。
+    // 不设为默认 —— 默认仍是「自动-最快」。
+    autoGroups.push(createAutoChain(
+      "自动-香港优先",
+      [
+        "香港",
+        "台湾",
+        "日本",
+        "韩国",
+        "新加坡",
+        "美国",
+        "加拿大",
+        "英国",
+        "德国",
+        "荷兰",
+        "爱沙尼亚"
+      ],
+      "fallback",
+      false
+    ));
+
   }
 
 
@@ -1695,16 +1721,17 @@ const main = (config) => {
   // 27. One-click Proxy
   // ================================================================
 
+  // 首项放自动链 —— select 的默认项就是第一项。
+  // 「自动-最快」为默认，「自动-香港优先」作为备用自动模式供手动选择。
   const mainCandidates =
-    availableRegions.concat([
-      "国内直连"
-    ]);
-
-
-  // 首项放自动降级链 —— select 的默认项就是第一项
-  if (autoGroups.length > 0) {
-    mainCandidates.unshift("自动-最快");
-  }
+    (autoGroups.length > 0
+      ? ["自动-最快", "自动-香港优先"]
+      : []).concat(
+      availableRegions,
+      [
+        "国内直连"
+      ]
+    );
 
 
   const mainSelector = {
@@ -1734,18 +1761,19 @@ const main = (config) => {
   // 28. Service groups
   // ================================================================
 
-  function createBusinessGroup(name, autoChain) {
+  // autoChains：自动链数组，按顺序插在候选最前面。
+  // 第一项即 select 组的默认项，其余作为可选的自动模式。
+  function createBusinessGroup(name, autoChains) {
 
     const candidates =
-      availableRegions.concat([
-        "国内直连"
-      ]);
-
-
-    // 把自动降级链放在第一位 —— select 组的默认项就是第一项
-    if (autoChain && autoGroups.length > 0) {
-      candidates.unshift(autoChain);
-    }
+      (autoChains && autoGroups.length > 0
+        ? autoChains
+        : []).concat(
+        availableRegions,
+        [
+          "国内直连"
+        ]
+      );
 
 
     const group = {
@@ -1851,34 +1879,34 @@ const main = (config) => {
 
 
   // 业务组：首项均为自动降级链，往下是手动可选的地区
-  const defaultChain = "自动-最快";
+  const defaultChains = ["自动-最快", "自动-香港优先"];
 
   const businessGroups = [
 
     // AI 服务：美国优先链 + 手动选择（OpenAI 不支持香港）
     createAIGroup(),
 
-    createBusinessGroup("YouTube", defaultChain),
+    createBusinessGroup("YouTube", defaultChains),
 
-    createBusinessGroup("Google", defaultChain),
+    createBusinessGroup("Google", defaultChains),
 
-    createBusinessGroup("GitHub", defaultChain),
+    createBusinessGroup("GitHub", defaultChains),
 
-    createBusinessGroup("Netflix", defaultChain),
+    createBusinessGroup("Netflix", defaultChains),
 
-    createBusinessGroup("Spotify", defaultChain),
+    createBusinessGroup("Spotify", defaultChains),
 
-    createBusinessGroup("Steam", defaultChain),
+    createBusinessGroup("Steam", defaultChains),
 
-    createBusinessGroup("Telegram", defaultChain),
+    createBusinessGroup("Telegram", defaultChains),
 
-    createBusinessGroup("TikTok", defaultChain),
+    createBusinessGroup("TikTok", defaultChains),
 
-    createBusinessGroup("X", defaultChain),
+    createBusinessGroup("X", defaultChains),
 
-    createBusinessGroup("Apple", defaultChain),
+    createBusinessGroup("Apple", defaultChains),
 
-    createBusinessGroup("Microsoft", defaultChain)
+    createBusinessGroup("Microsoft", defaultChains)
 
   ];
 
