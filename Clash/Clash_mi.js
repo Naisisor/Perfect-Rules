@@ -1895,28 +1895,27 @@ function main(config) {
 
     createBusinessGroup("YouTube", defaultChains),
 
-    createBusinessGroup("Google", defaultChains),
-
-    createBusinessGroup("GitHub", defaultChains),
-
-    createBusinessGroup("Netflix", defaultChains),
-
-    createBusinessGroup("Spotify", defaultChains),
-
-    createBusinessGroup("Steam", defaultChains),
-
     createBusinessGroup("Telegram", defaultChains),
 
     createBusinessGroup("WhatsApp", defaultChains),
 
+    createBusinessGroup("X", defaultChains),
+
+    createBusinessGroup("Netflix", defaultChains),
+
+    createBusinessGroup("Google", defaultChains),
+
+    createBusinessGroup("GitHub", defaultChains),
+
+    createBusinessGroup("Spotify", defaultChains),
+
     createBusinessGroup("TikTok", defaultChains),
 
-    createBusinessGroup("X", defaultChains),
+    createBusinessGroup("Steam", defaultChains),
 
     createBusinessGroup("Apple", defaultChains),
 
     createBusinessGroup("Microsoft", defaultChains)
-
   ];
 
 
