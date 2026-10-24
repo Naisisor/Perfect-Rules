@@ -1,0 +1,3 @@
+payload:
+  # WhatsApp 官方域名（wa.me / whatsapp.com / whatsapp.net 等）
+  - GEOSITE,whatsapp

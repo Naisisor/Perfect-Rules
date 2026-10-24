@@ -385,6 +385,8 @@ const main = (config) => {
 
     "Telegram": "Telegram.png",
 
+    "WhatsApp": "WhatsApp.png",
+
     "TikTok": "TikTok.png",
 
     "Apple": "Apple.png",
@@ -474,6 +476,8 @@ const main = (config) => {
     "Steam": true,
 
     "Telegram": true,
+
+    "WhatsApp": true,
 
     "TikTok": true,
 
@@ -1029,6 +1033,9 @@ const main = (config) => {
 
     "Telegram":
       createRuleProvider("telegram.yaml"),
+
+    "WhatsApp":
+      createRuleProvider("whatsapp.yaml"),
 
     "TikTok":
       createRuleProvider("tiktok.yaml"),
@@ -1900,6 +1907,8 @@ const main = (config) => {
 
     createBusinessGroup("Telegram", defaultChains),
 
+    createBusinessGroup("WhatsApp", defaultChains),
+
     createBusinessGroup("TikTok", defaultChains),
 
     createBusinessGroup("X", defaultChains),
@@ -2160,6 +2169,13 @@ const main = (config) => {
     // --------------------------------------------------------------
 
     "RULE-SET,Telegram,Telegram",
+
+
+    // --------------------------------------------------------------
+    // WhatsApp
+    // --------------------------------------------------------------
+
+    "RULE-SET,WhatsApp,WhatsApp",
 
 
     // --------------------------------------------------------------
