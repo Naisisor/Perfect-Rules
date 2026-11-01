@@ -1851,12 +1851,12 @@ const main = (config) => {
     }
 
 
-    // 默认项必须是「美国」这个地区组本身，而不是降级链。
-    // 降级链放在第 2 位：需要自动降级时手动切过去即可。
-    // 这样 AI 的出口稳定在美国，不会因美国节点波动而悄悄换到日本，
-    // 避免 OpenAI 风控看到 IP 跳变。
+    // 自动链放最前面（只作为可选项）。
+    // 默认出口由 default-selected 锁定为「美国」—— 美国节点波动时不会
+    // 自动换到日本 / 新加坡，避免出口 IP 跳变触发 OpenAI 风控。
     if (autoGroups.length > 0) {
-      proxies.splice(1, 0, "自动-美国优先");
+      proxies.unshift("自动-最快");
+      proxies.unshift("自动-美国优先");
     }
 
 
@@ -1869,6 +1869,13 @@ const main = (config) => {
       "proxies": proxies
 
     };
+
+
+    // 默认选中「美国」：自动链虽然排在候选最前面，但不作为默认出口。
+    // 「美国」不存在时 mihomo 会自动退回组内第一项。
+    if (proxies.indexOf("美国") !== -1) {
+      group["default-selected"] = "美国";
+    }
 
 
     const icon =
