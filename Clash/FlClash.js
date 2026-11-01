@@ -1852,10 +1852,10 @@ const main = (config) => {
 
 
     // 自动链放最前面（只作为可选项）。
-    // 默认出口由 default-selected 锁定为「美国」—— 美国节点波动时不会
-    // 自动换到日本 / 新加坡，避免出口 IP 跳变触发 OpenAI 风控。
+    // 只放「自动-美国优先」：AI 流量不走「自动-最快」，
+    // 否则可能落到香港（OpenAI 不支持），或选出日本/新加坡导致出口 IP 漂移。
+    // 默认出口由 default-selected 锁定为「美国」。
     if (autoGroups.length > 0) {
-      proxies.unshift("自动-最快");
       proxies.unshift("自动-美国优先");
     }
 
