@@ -1752,6 +1752,12 @@ function main(config) {
   };
 
 
+  // 默认选中「自动-香港优先」：候选顺序保持不变，只改默认项
+  if (mainCandidates.indexOf("自动-香港优先") !== -1) {
+    mainSelector["default-selected"] = "自动-香港优先";
+  }
+
+
   var mainIcon =
     getGroupIcon("默认代理");
 
@@ -1792,6 +1798,13 @@ function main(config) {
       "proxies": candidates
 
     };
+
+
+    // 默认选中「自动-香港优先」：候选顺序保持不变，只改默认项。
+    // 「自动-香港优先」不存在时（如机场没节点）不设置，mihomo 会退回第一项。
+    if (candidates.indexOf("自动-香港优先") !== -1) {
+      group["default-selected"] = "自动-香港优先";
+    }
 
 
     var icon =
