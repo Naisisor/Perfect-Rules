@@ -1775,8 +1775,9 @@ const main = (config) => {
   // ================================================================
 
   // autoChains：自动链数组，按顺序插在候选最前面。
-  // 第一项即 select 组的默认项，其余作为可选的自动模式。
-  function createBusinessGroup(name, autoChains) {
+  // preferredDefaults：默认选中项的候选列表，取第一个存在于候选里的。
+  //                    不传时默认「自动-香港优先」。
+  function createBusinessGroup(name, autoChains, preferredDefaults) {
 
     const candidates =
       (autoChains && autoGroups.length > 0
@@ -1800,10 +1801,21 @@ const main = (config) => {
     };
 
 
-    // 默认选中「自动-香港优先」：候选顺序保持不变，只改默认项。
-    // 「自动-香港优先」不存在时（如机场没节点）不设置，mihomo 会退回第一项。
-    if (candidates.indexOf("自动-香港优先") !== -1) {
-      group["default-selected"] = "自动-香港优先";
+    // 默认选中项：候选顺序保持不变，只改默认项。
+    // 指定的默认项都不存在时（如机场没这些地区的节点）不设置，mihomo 会退回第一项。
+    const defaults =
+      preferredDefaults || ["自动-香港优先"];
+
+    const picked =
+      defaults.filter((item) => {
+
+        return candidates.indexOf(item) !== -1;
+
+      })[0];
+
+
+    if (picked) {
+      group["default-selected"] = picked;
     }
 
 
@@ -1929,7 +1941,17 @@ const main = (config) => {
 
     createBusinessGroup("Spotify", defaultChains),
 
-    createBusinessGroup("TikTok", defaultChains),
+    // TikTok：香港不可用（TikTok 已停止香港运营），默认走美国（内容最全）。
+    // 机场没有美国节点时，依次退回日本 / 新加坡 / 台湾 / 韩国 / 英国 / 德国。
+    createBusinessGroup("TikTok", defaultChains, [
+      "美国",
+      "日本",
+      "新加坡",
+      "台湾",
+      "韩国",
+      "英国",
+      "德国"
+    ]),
 
     createBusinessGroup("Steam", defaultChains),
 
