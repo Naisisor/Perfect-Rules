@@ -1752,9 +1752,10 @@ function main(config) {
   };
 
 
-  // 默认选中「自动-香港优先」：候选顺序保持不变，只改默认项
-  if (mainCandidates.indexOf("自动-香港优先") !== -1) {
-    mainSelector["default-selected"] = "自动-香港优先";
+  // 默认选中「自动-最快」：候选顺序保持不变，只改默认项。
+  // 「自动-最快」不存在时（机场没节点）不设置，mihomo 退回第一项。
+  if (mainCandidates.indexOf("自动-最快") !== -1) {
+    mainSelector["default-selected"] = "自动-最快";
   }
 
 
